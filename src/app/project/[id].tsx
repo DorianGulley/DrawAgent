@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from "convex/react";
 import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
@@ -9,7 +10,7 @@ import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut, FadeOutDown } from "re
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
-import { AppDoc } from "../../../shared/model";
+import { AppDoc, DEFAULT_STYLE } from "../../../shared/model";
 import { AppPreview, PreviewHandle, Selection } from "../../components/AppPreview";
 import { EditSheet } from "../../components/EditSheet";
 import { HistorySheet } from "../../components/HistorySheet";
@@ -106,6 +107,9 @@ export default function ProjectScreen() {
   };
 
   const topBarHeight = 52;
+  const screenBackground = String(doc.root.style.backgroundColor ?? DEFAULT_STYLE.screen.backgroundColor);
+  const fade = screenBackground + "F2";
+  const fadeClear = screenBackground + "00";
 
   return (
     <View style={styles.fill}>
@@ -122,6 +126,8 @@ export default function ProjectScreen() {
         }}
         style={styles.fill}
       />
+
+      <LinearGradient pointerEvents="none" colors={[fade, fadeClear]} locations={[0.55, 1]} style={[styles.topFade, { height: insets.top + 74 }]} />
 
       <View pointerEvents="box-none" style={[styles.topBar, { paddingTop: insets.top + 6 }]}>
         <Pressable testID="back-button" accessibilityLabel="Back to projects" onPress={() => router.back()}>
@@ -177,7 +183,7 @@ export default function ProjectScreen() {
                 )}
                 <View style={styles.hintPill}>
                   <SymbolView name="hand.tap" size={16} tintColor="#fff" />
-                  <Text style={styles.hintText}>Tap anything to change it</Text>
+                  <Text style={styles.hintText}>Tap to select</Text>
                 </View>
                 <Pressable testID="edit-done" accessibilityLabel="Done editing" onPress={toggleEdit} style={styles.doneButton}>
                   <Text style={styles.doneText}>Done</Text>
@@ -209,6 +215,7 @@ export default function ProjectScreen() {
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: colors.canvas },
   center: { alignItems: "center", justifyContent: "center" },
+  topFade: { position: "absolute", top: 0, left: 0, right: 0 },
   topBar: { position: "absolute", top: 0, left: 0, right: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14 },
   circle: { width: 40, height: 40, borderRadius: 20, overflow: "hidden", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.55)" },
   titlePill: { flexDirection: "row", alignItems: "center", gap: 7, height: 40, paddingHorizontal: 16, borderRadius: 20, overflow: "hidden", backgroundColor: "rgba(255,255,255,0.55)" },

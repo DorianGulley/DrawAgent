@@ -9,6 +9,7 @@ h2,p{margin:0}
 h2{letter-spacing:-0.02em;line-height:1.12}
 p{line-height:1.4}
 .d-screen{display:flex;flex-direction:column;min-height:100vh;padding:calc(var(--inset-top,0px) + var(--pad)) var(--pad) calc(var(--inset-bottom,0px) + var(--pad))}
+body.d-edit .d-screen{padding-bottom:calc(var(--sheet,300px) + var(--pad))}
 .d-header,.d-card,.d-section{display:flex;flex-direction:column}
 .d-card{box-shadow:0 1px 2px rgba(20,16,10,.04),0 8px 24px rgba(20,16,10,.05)}
 .d-button{display:block;width:100%;border:0;font-family:inherit;letter-spacing:-0.01em;transition:transform .15s ease,filter .15s ease}
@@ -80,10 +81,16 @@ const RUNTIME = String.raw`
     sel.querySelector('.tag').textContent = el.getAttribute('data-direct-label');
     sel.className = 'on' + (r.top < (window.__insetTop || 0) + 40 ? ' below' : '');
   }
+  function reveal(el){
+    var r = el.getBoundingClientRect(), top = (window.__insetTop || 0) + 12, bottom = window.innerHeight - 300;
+    if (r.bottom > bottom) window.scrollBy({ top: Math.min(r.bottom - bottom, r.top - top), behavior: 'smooth' });
+    else if (r.top < top) window.scrollBy({ top: r.top - top, behavior: 'smooth' });
+  }
   function select(el){
     selectedId = el ? el.getAttribute('data-direct-id') : null;
     placeSelection();
     if (!el) { post({ type: 'deselect' }); return; }
+    reveal(el);
     var name = el.querySelector('.d-habit-name, .d-stat-value');
     post({ type: 'select', id: selectedId, nodeType: el.getAttribute('data-direct-type'), label: el.getAttribute('data-direct-label'), text: (name || el).textContent.trim().slice(0, 60) });
   }
@@ -141,7 +148,7 @@ const RUNTIME = String.raw`
         el.classList.add('d-flash');
         if (i === 0) {
           var r = el.getBoundingClientRect();
-          if (r.top < 80 || r.bottom > window.innerHeight - 260) window.scrollBy({ top: r.top - window.innerHeight / 3, behavior: 'smooth' });
+          if (r.top < (window.__insetTop || 0) || r.bottom > window.innerHeight - 300) reveal(el);
         }
         setTimeout(function(){ el.classList.remove('d-flash'); placeSelection(); }, 1900);
       });
