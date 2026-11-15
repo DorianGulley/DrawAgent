@@ -44,3 +44,4 @@ yarn-error.*
 .agents/
 .claude/
 skills-lock.json
+.direct.json

@@ -8,9 +8,10 @@
  * @module
  */
 
-import type * as edits from "../edits.js";
+import type * as agent from "../agent.js";
+import type * as feedback from "../feedback.js";
+import type * as lib from "../lib.js";
 import type * as projects from "../projects.js";
-import type * as versions from "../versions.js";
 
 import type {
   ApiFromModules,
@@ -19,9 +20,10 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  edits: typeof edits;
+  agent: typeof agent;
+  feedback: typeof feedback;
+  lib: typeof lib;
   projects: typeof projects;
-  versions: typeof versions;
 }>;
 
 /**

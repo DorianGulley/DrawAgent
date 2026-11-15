@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Bloom</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="screen">
+    <header class="header">
+      <p class="greeting">Good morning, Alex</p>
+      <h1 class="title">Today</h1>
+    </header>
+
+    <section class="card progress-card">
+      <h2 class="card-title">Daily progress</h2>
+      <div class="progress"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="progress-meta"><span id="progress-count"></span><span id="progress-percent"></span></div>
+      <p class="encouragement">Small steps, every day.</p>
+    </section>
+
+    <section class="habits">
+      <h2 class="section-title">Today's habits</h2>
+      <ul class="habit-list" id="habit-list"></ul>
+    </section>
+
+    <section class="stats">
+      <div class="stat"><span class="stat-value">12</span><span class="stat-label">Day streak</span></div>
+      <div class="stat"><span class="stat-value">86%</span><span class="stat-label">This week</span></div>
+      <div class="stat"><span class="stat-value">4</span><span class="stat-label">Perfect days</span></div>
+    </section>
+
+    <button class="primary-button" id="complete-all">Complete all habits</button>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

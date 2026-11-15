@@ -1,27 +1,71 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+export const feedbackStatus = v.union(
+  v.literal("pending"),
+  v.literal("claimed"),
+  v.literal("working"),
+  v.literal("published"),
+  v.literal("failed"),
+);
+
+export const elementInfo = v.object({
+  selector: v.string(),
+  tag: v.string(),
+  text: v.string(),
+  styles: v.record(v.string(), v.string()),
+});
+
+export const mark = v.object({
+  kind: v.union(v.literal("pen"), v.literal("arrow"), v.literal("circle"), v.literal("text")),
+  tag: v.union(v.literal("change"), v.literal("broken"), v.literal("keep")),
+  points: v.array(v.object({ x: v.number(), y: v.number() })),
+  text: v.optional(v.string()),
+  elements: v.array(elementInfo),
+});
+
 export default defineSchema({
   projects: defineTable({
     name: v.string(),
-    tagline: v.string(),
+    url: v.string(),
     emoji: v.string(),
-    templateId: v.string(),
-    doc: v.any(),
-    currentVersionId: v.optional(v.id("versions")),
+    agent: v.string(),
+    keyHash: v.string(),
     versionCount: v.number(),
+    latestVersionId: v.optional(v.id("versions")),
     updatedAt: v.number(),
-  }).index("by_updatedAt", ["updatedAt"]),
+  })
+    .index("by_updatedAt", ["updatedAt"])
+    .index("by_keyHash", ["keyHash"]),
+  feedback: defineTable({
+    projectId: v.id("projects"),
+    note: v.string(),
+    marks: v.array(mark),
+    imageId: v.optional(v.id("_storage")),
+    viewport: v.object({ width: v.number(), height: v.number(), scrollY: v.number() }),
+    pageUrl: v.string(),
+    baseVersionId: v.optional(v.id("versions")),
+    status: feedbackStatus,
+    statusMessage: v.optional(v.string()),
+    versionId: v.optional(v.id("versions")),
+    updatedAt: v.number(),
+  })
+    .index("by_projectId", ["projectId"])
+    .index("by_projectId_and_status", ["projectId", "status"]),
+  feedbackEvents: defineTable({
+    feedbackId: v.id("feedback"),
+    status: feedbackStatus,
+    message: v.string(),
+    at: v.number(),
+  }).index("by_feedbackId", ["feedbackId"]),
   versions: defineTable({
     projectId: v.id("projects"),
     number: v.number(),
-    parentId: v.optional(v.id("versions")),
-    doc: v.any(),
+    feedbackId: v.optional(v.id("feedback")),
     summary: v.string(),
-    instruction: v.optional(v.string()),
-    elementId: v.optional(v.string()),
-    operations: v.any(),
-    changedIds: v.array(v.string()),
+    url: v.string(),
+    commitSha: v.optional(v.string()),
+    afterImageId: v.optional(v.id("_storage")),
     createdAt: v.number(),
   }).index("by_projectId_and_number", ["projectId", "number"]),
 });
