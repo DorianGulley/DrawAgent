@@ -18,13 +18,15 @@ import { Timeline } from "../../components/Timeline";
 import { colors, fonts } from "../../theme";
 
 export default function ProjectScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, base } = useLocalSearchParams<{ id: string; base?: string }>();
   const projectId = id as Id<"projects">;
   const insets = useSafeAreaInsets();
   const project = useQuery(api.projects.get, { projectId });
   const feedback = useQuery(api.feedback.listForProject, { projectId });
   const generateUploadUrl = useMutation(api.feedback.generateUploadUrl);
   const createFeedback = useMutation(api.feedback.create);
+  const timeline = useQuery(api.feedback.timeline, base ? { projectId } : "skip");
+  const [baseVersion, setBaseVersion] = useState<{ id: Id<"versions">; number: number } | null>(null);
 
   const live = useRef<LiveAppHandle>(null);
   const frame = useRef<ComponentRef<typeof View>>(null);
@@ -49,6 +51,15 @@ export default function ProjectScreen() {
     }
     seenVersion.current = latest;
   }, [project?.latestVersionId]);
+
+  useEffect(() => {
+    if (!base || !timeline) return;
+    const version = timeline.find((item) => item.number === Number(base));
+    if (!version) return;
+    setBaseVersion({ id: version._id, number: version.number });
+    const picture = version.afterUrl ?? version.beforeUrl;
+    if (picture) setAnnotating({ frameUri: picture, viewport: { width: 0, height: 0, scrollY: 0, url: version.url } });
+  }, [timeline === undefined]);
 
   useEffect(() => {
     if (!celebrate) return;
@@ -103,7 +114,9 @@ export default function ProjectScreen() {
       imageId: storageId,
       viewport: { width: viewport.width, height: viewport.height, scrollY: viewport.scrollY },
       pageUrl: viewport.url,
+      baseVersionId: baseVersion?.id,
     });
+    setBaseVersion(null);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setAnnotating(null);
   };
@@ -129,11 +142,18 @@ export default function ProjectScreen() {
             </View>
           </BlurView>
         </Animated.View>
-        <Pressable testID="timeline-button" accessibilityLabel="Timeline" onPress={() => setTimelineOpen(true)}>
-          <BlurView intensity={60} tint="light" style={styles.circle}>
-            <SymbolView name="clock.arrow.circlepath" size={16} tintColor={colors.ink} weight="semibold" />
-          </BlurView>
-        </Pressable>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <Pressable testID="scrub-button" accessibilityLabel="Scroll through versions" onPress={() => router.push({ pathname: "/history/[id]", params: { id: projectId, type: "project" } })}>
+            <BlurView intensity={60} tint="light" style={styles.circle}>
+              <SymbolView name="clock.arrow.trianglehead.counterclockwise.rotate.90" size={16} tintColor={colors.ink} weight="semibold" />
+            </BlurView>
+          </Pressable>
+          <Pressable testID="timeline-button" accessibilityLabel="Timeline" onPress={() => setTimelineOpen(true)}>
+            <BlurView intensity={60} tint="light" style={styles.circle}>
+              <SymbolView name="list.bullet" size={16} tintColor={colors.ink} weight="semibold" />
+            </BlurView>
+          </Pressable>
+        </View>
       </View>
 
       {!annotating && (
@@ -176,7 +196,17 @@ export default function ProjectScreen() {
 
       {annotating && (
         <Animated.View entering={FadeIn.duration(120)} exiting={FadeOut.duration(200)} style={StyleSheet.absoluteFill}>
-          <Annotator frameUri={annotating.frameUri} hitTest={(probes) => live.current!.hitTest(probes.map((probe) => ({ ...probe, points: toWeb(probe.points) })))} onCancel={() => setAnnotating(null)} onSubmit={submit} />
+          <Annotator
+            frameUri={annotating.frameUri}
+            agentName={agent}
+            heading={baseVersion ? `Marking up v${baseVersion.number}` : undefined}
+            hitTest={(probes) => (baseVersion ? Promise.resolve(probes.map(() => [])) : live.current!.hitTest(probes.map((probe) => ({ ...probe, points: toWeb(probe.points) }))))}
+            onCancel={() => {
+              setAnnotating(null);
+              setBaseVersion(null);
+            }}
+            onSubmit={submit}
+          />
         </Animated.View>
       )}
 

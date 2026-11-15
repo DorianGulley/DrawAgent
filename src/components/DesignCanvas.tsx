@@ -1,5 +1,5 @@
 import * as Haptics from "expo-haptics";
-import { ComponentType, Ref, RefObject, useEffect, useRef, useState } from "react";
+import { ComponentType, Ref, RefObject, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { StyleProp, ViewStyle } from "react-native";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
 import type { IOSWebViewProps } from "react-native-webview/lib/WebViewTypes";
@@ -7,6 +7,11 @@ import { KindSpec } from "../../shared/kinds";
 import { AppDoc, NodeType } from "../../shared/model";
 import { buildPreviewHtml } from "../../shared/preview";
 import { renderBody } from "../../shared/render";
+import type { ElementInfo, Probe } from "./LiveApp";
+
+export interface CanvasHandle {
+  hitTest(probes: Probe[]): Promise<ElementInfo[][]>;
+}
 
 const IOSWebView = WebView as unknown as ComponentType<IOSWebViewProps & { ref: Ref<WebView> }>;
 
@@ -33,6 +38,7 @@ interface Props {
   onLongPress?: (picked: Picked) => void;
   onReady?: () => void;
   viewRef?: RefObject<WebView | null>;
+  handle?: Ref<CanvasHandle>;
   testID?: string;
   style?: StyleProp<ViewStyle>;
 }
@@ -53,6 +59,7 @@ export function DesignCanvas({
   onLongPress,
   onReady,
   viewRef,
+  handle,
   testID = "design-canvas",
   style,
 }: Props) {
@@ -64,6 +71,20 @@ export function DesignCanvas({
   useEffect(() => {
     latest.current = { doc, editMode, selection, selectionLabel, insetTop, insetBottom };
   });
+
+  const pending = useRef(new Map<number, (result: ElementInfo[][]) => void>());
+  const nextId = useRef(1);
+  useImperativeHandle(handle, () => ({
+    hitTest: (probes) =>
+      new Promise((resolve) => {
+        const requestId = nextId.current++;
+        pending.current.set(requestId, resolve);
+        webRef.current?.injectJavaScript(`window.__direct.hitTest(${requestId}, ${JSON.stringify(probes)});true;`);
+        setTimeout(() => {
+          if (pending.current.delete(requestId)) resolve(probes.map(() => []));
+        }, 1500);
+      }),
+  }));
 
   const run = (script: string) => webRef.current?.injectJavaScript(`${script};true;`);
   const render = (next: AppDoc, changed: string[]) => run(`window.__direct.render(${JSON.stringify(renderBody(next))}, ${JSON.stringify(changed)})`);
@@ -97,6 +118,10 @@ export function DesignCanvas({
       run(`window.__direct.setEditMode(${current.editMode})`);
       select(current.selection, current.selectionLabel, null);
       onReady?.();
+    } else if (message.type === "hit") {
+      const resolve = pending.current.get(message.requestId);
+      pending.current.delete(message.requestId);
+      resolve?.(message.result);
     } else if (message.type === "tap") {
       Haptics.selectionAsync();
       onTap?.(picked);

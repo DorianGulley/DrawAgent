@@ -34,6 +34,8 @@ interface Props {
   hitTest: (probes: Probe[]) => Promise<ElementInfo[][]>;
   onCancel: () => void;
   onSubmit: (input: { note: string; marks: Mark[]; imageUri: string }) => Promise<void>;
+  agentName?: string;
+  heading?: string;
 }
 
 function probeFor(kind: Tool, points: Point[]): Probe {
@@ -117,7 +119,7 @@ function Flash() {
   return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: "#fff" }, style]} />;
 }
 
-export function Annotator({ frameUri, hitTest, onCancel, onSubmit }: Props) {
+export function Annotator({ frameUri, hitTest, onCancel, onSubmit, agentName = "your agent", heading }: Props) {
   const insets = useSafeAreaInsets();
   const canvas = useRef<ComponentRef<typeof View>>(null);
   const [marks, setMarks] = useState<Mark[]>([]);
@@ -304,7 +306,7 @@ export function Annotator({ frameUri, hitTest, onCancel, onSubmit }: Props) {
             <View style={styles.grabber} />
             <Text style={styles.sheetTitle}>What should change?</Text>
             <Text style={styles.sheetSub}>
-              Your agent gets the screenshot, your {marks.length} mark{marks.length === 1 ? "" : "s"}, and the elements under them.
+              {heading ? `${heading}. ` : ""}{agentName.charAt(0).toUpperCase() + agentName.slice(1)} gets the screenshot, your {marks.length} mark{marks.length === 1 ? "" : "s"}, and the parts under them.
             </Text>
             <TextInput
               testID="feedback-note"
@@ -323,9 +325,9 @@ export function Annotator({ frameUri, hitTest, onCancel, onSubmit }: Props) {
               <Pressable onPress={() => setStep("draw")} disabled={step === "sending"} style={styles.backButton}>
                 <Text style={styles.backText}>Keep drawing</Text>
               </Pressable>
-              <Pressable testID="feedback-send" accessibilityLabel="Send to agent" onPress={send} disabled={step === "sending"} style={styles.sendButton}>
+              <Pressable testID="feedback-send" accessibilityLabel={`Send to ${agentName}`} onPress={send} disabled={step === "sending"} style={styles.sendButton}>
                 <SymbolView name="paperplane.fill" size={15} tintColor="#fff" />
-                <Text style={styles.sendText}>{step === "sending" ? "Sending…" : "Send to agent"}</Text>
+                <Text style={styles.sendText}>{step === "sending" ? "Sending…" : `Send to ${agentName}`}</Text>
               </Pressable>
             </View>
           </Animated.View>

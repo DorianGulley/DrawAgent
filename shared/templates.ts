@@ -132,66 +132,6 @@ const wanderlist: AppDoc = {
   }),
 };
 
-const widget = (id: string, label: string, value: string, style: StyleMap = {}) =>
-  node("card", `${label} widget`, {
-    id,
-    style: { padding: 16, gap: 4, borderRadius: 24, ...style },
-    children: [
-      node("text", `${label} label`, { id: `${id}-label`, text: label, style: { fontSize: 13, fontWeight: 600 } }),
-      node("heading", `${label} value`, { id: `${id}-value`, text: value, style: { fontSize: 22 } }),
-    ],
-  });
-
-const lockDusk: AppDoc = {
-  schemaVersion: 1,
-  root: node("screen", "Wallpaper", {
-    id: "screen",
-    style: { backgroundColor: "#FF9A6B", accentColor: "#2A1B5E", color: "#FFFFFF", padding: 28, gap: 14 },
-    children: [
-      node("header", "Time and date", {
-        id: "header",
-        style: { gap: 0 },
-        children: [
-          node("text", "Date", { id: "date", text: "Sunday, November 15", style: { fontSize: 19, fontWeight: 600, textAlign: "center" } }),
-          node("clock", "Clock", { id: "clock", text: "9:41" }),
-        ],
-      }),
-      node("row", "Widgets", {
-        id: "widgets",
-        children: [
-          widget("widget-weather", "Weather", "68° Sunny", { backgroundColor: "#FFFFFF33", color: "#FFFFFF" }),
-          widget("widget-rings", "Move", "420 cal", { backgroundColor: "#FFFFFF33", color: "#FFFFFF" }),
-        ],
-      }),
-    ],
-  }),
-};
-
-const lockMono: AppDoc = {
-  schemaVersion: 1,
-  root: node("screen", "Wallpaper", {
-    id: "screen",
-    style: { backgroundColor: "#111111", accentColor: "#3A3A3A", color: "#F4F1EA", padding: 28, gap: 14 },
-    children: [
-      node("header", "Time and date", {
-        id: "header",
-        style: { gap: 0 },
-        children: [
-          node("text", "Date", { id: "date", text: "SUN 15", style: { fontSize: 17, fontWeight: 700, textAlign: "center" } }),
-          node("clock", "Clock", { id: "clock", text: "9:41", style: { fontSize: 104, fontWeight: 300 } }),
-        ],
-      }),
-      node("row", "Widgets", {
-        id: "widgets",
-        children: [
-          widget("widget-next", "Next", "Standup 10:00", { backgroundColor: "#F4F1EA", color: "#111111" }),
-          widget("widget-steps", "Steps", "6,214", { backgroundColor: "#F4F1EA", color: "#111111" }),
-        ],
-      }),
-    ],
-  }),
-};
-
 const logoSprout: AppDoc = {
   schemaVersion: 1,
   root: node("screen", "Canvas", {
@@ -230,6 +170,30 @@ const logoMonogram: AppDoc = {
   }),
 };
 
+const iconBadge: AppDoc = {
+  schemaVersion: 1,
+  root: node("screen", "Icon", {
+    id: "screen",
+    style: { backgroundColor: "#FF8A5B", accentColor: "#C2410C", color: "#FFFFFF", padding: 0, gap: 0 },
+    children: [node("heading", "Letter", { id: "letter", text: "W", style: { fontSize: 300, fontWeight: 800, textAlign: "center" } })],
+  }),
+};
+
+const iconGlyph: AppDoc = {
+  schemaVersion: 1,
+  root: node("screen", "Icon", {
+    id: "screen",
+    style: { backgroundColor: "#F5F1EA", color: "#1B1A17", padding: 0, gap: 0 },
+    children: [
+      node("shape", "Glyph", {
+        id: "glyph",
+        style: { backgroundColor: "#2F9E5B", width: 280, height: 280, borderRadius: 999 },
+        children: [node("heading", "Glyph letter", { id: "glyph-letter", text: "✦", style: { fontSize: 150, color: "#FFFFFF" } })],
+      }),
+    ],
+  }),
+};
+
 export interface Template {
   id: string;
   name: string;
@@ -242,8 +206,8 @@ export const TEMPLATES: Record<string, Template> = {
   habits: { id: "habits", name: "Bloom", tagline: "Habit tracker", emoji: "🌱", doc: habitTracker },
   dashboard: { id: "dashboard", name: "Daybook", tagline: "Personal dashboard", emoji: "☀️", doc: personalDashboard },
   wanderlist: { id: "wanderlist", name: "Wanderlist", tagline: "Travel board", emoji: "🧭", doc: wanderlist },
-  dusk: { id: "dusk", name: "Dusk", tagline: "Warm gradient", emoji: "🌇", doc: lockDusk },
-  mono: { id: "mono", name: "Mono", tagline: "Quiet and graphic", emoji: "🖤", doc: lockMono },
   sprout: { id: "sprout", name: "Sprout", tagline: "Round mark + wordmark", emoji: "🌿", doc: logoSprout },
   monogram: { id: "monogram", name: "Monogram", tagline: "Bold single letter", emoji: "🅳", doc: logoMonogram },
+  badge: { id: "badge", name: "Badge", tagline: "Gradient with a letter", emoji: "🟧", doc: iconBadge },
+  glyph: { id: "glyph", name: "Glyph", tagline: "A mark on a calm ground", emoji: "✦", doc: iconGlyph },
 };

@@ -15,7 +15,12 @@ export const designScope = v.union(
   v.literal("many"),
   v.literal("everything"),
   v.literal("example"),
+  v.literal("agent"),
 );
+
+export const provider = v.union(v.literal("openai"), v.literal("anthropic"));
+export const componentRole = v.union(v.literal("app"), v.literal("logo"), v.literal("icon"));
+export const runStatus = v.union(v.literal("queued"), v.literal("thinking"), v.literal("done"), v.literal("failed"));
 
 export const elementInfo = v.object({
   selector: v.string(),
@@ -96,8 +101,52 @@ export default defineSchema({
     changedIds: v.array(v.string()),
     scope: designScope,
     instruction: v.optional(v.string()),
+    parent: v.optional(v.number()),
     createdAt: v.number(),
   }).index("by_designId_and_number", ["designId", "number"]),
+  apiKeys: defineTable({
+    ownerHash: v.string(),
+    provider,
+    label: v.string(),
+    last4: v.string(),
+    model: v.string(),
+    ciphertext: v.string(),
+    iv: v.string(),
+    createdAt: v.number(),
+  }).index("by_ownerHash", ["ownerHash"]),
+  workspaces: defineTable({
+    ownerHash: v.string(),
+    name: v.string(),
+    emoji: v.string(),
+    keyId: v.optional(v.id("apiKeys")),
+    updatedAt: v.number(),
+  }).index("by_ownerHash_and_updatedAt", ["ownerHash", "updatedAt"]),
+  components: defineTable({
+    workspaceId: v.id("workspaces"),
+    role: componentRole,
+    name: v.string(),
+    usage: v.string(),
+    designId: v.optional(v.id("designs")),
+    projectId: v.optional(v.id("projects")),
+    order: v.number(),
+  })
+    .index("by_workspaceId_and_order", ["workspaceId", "order"])
+    .index("by_designId", ["designId"])
+    .index("by_projectId", ["projectId"]),
+  agentRuns: defineTable({
+    componentId: v.id("components"),
+    workspaceId: v.id("workspaces"),
+    note: v.string(),
+    marks: v.array(v.object({ tag: v.string(), text: v.optional(v.string()), ids: v.array(v.string()) })),
+    imageId: v.optional(v.id("_storage")),
+    baseNumber: v.number(),
+    status: runStatus,
+    message: v.string(),
+    summary: v.optional(v.string()),
+    versionNumber: v.optional(v.number()),
+    model: v.optional(v.string()),
+    updatedAt: v.number(),
+  }).index("by_componentId", ["componentId"]),
   styleMemory: defineTable({
     ownerHash: v.string(),
     tallies: v.record(v.string(), v.array(v.union(v.number(), v.string()))),

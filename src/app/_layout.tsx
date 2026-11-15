@@ -36,6 +36,11 @@ export default function RootLayout() {
         <Stack.Screen name="new/index" options={{ animation: "slide_from_bottom" }} />
         <Stack.Screen name="new/[kind]" />
         <Stack.Screen name="style" />
+        <Stack.Screen name="settings" />
+        <Stack.Screen name="workspace/new" options={{ animation: "slide_from_bottom" }} />
+        <Stack.Screen name="workspace/[id]" />
+        <Stack.Screen name="part/[id]" options={{ animation: "fade_from_bottom", gestureEnabled: false }} />
+        <Stack.Screen name="history/[id]" options={{ animation: "fade" }} />
       </Stack>
     </ConvexProvider>
   );
