@@ -1,3 +1,4 @@
+import { File, Paths } from "expo-file-system";
 import * as SecureStore from "expo-secure-store";
 
 const KEY = "direct.deviceKey";
@@ -9,13 +10,35 @@ function randomHex(bytes: number): string {
   return Array.from(values, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+const VALID = /^dev_[a-f0-9]{48}$/;
 let cached: string | null = null;
+
+function fromKeychain(): string | null {
+  try {
+    return SecureStore.getItem(KEY);
+  } catch {
+    return null;
+  }
+}
+
+function fromFile(file: File): string | null {
+  try {
+    return file.exists ? file.textSync().trim() : null;
+  } catch {
+    return null;
+  }
+}
 
 export function deviceKey(): string {
   if (cached) return cached;
-  const stored = SecureStore.getItem(KEY);
-  if (stored && /^dev_[a-f0-9]{48}$/.test(stored)) return (cached = stored);
+  const file = new File(Paths.document, "direct-device-key");
+  const stored = [fromKeychain(), fromFile(file)].find((value) => value && VALID.test(value));
+  if (stored) return (cached = stored);
   const fresh = `dev_${randomHex(24)}`;
-  SecureStore.setItem(KEY, fresh);
+  try {
+    SecureStore.setItem(KEY, fresh);
+  } catch {
+    file.write(fresh).catch(() => {});
+  }
   return (cached = fresh);
 }
