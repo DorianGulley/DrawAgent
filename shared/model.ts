@@ -152,14 +152,3 @@ export function walkNodes(root: AppNode, visit: (node: AppNode) => void) {
   visit(root);
   for (const child of root.children ?? []) walkNodes(child, visit);
 }
-
-export function describeStructure(doc: AppDoc): string {
-  const lines: string[] = [];
-  const walk = (node: AppNode, depth: number) => {
-    const text = node.text ? ` "${node.text}"` : "";
-    lines.push(`${"  ".repeat(depth)}- ${node.id} [${node.type}] ${node.name}${text}`);
-    for (const child of node.children ?? []) walk(child, depth + 1);
-  };
-  walk(doc.root, 0);
-  return lines.join("\n");
-}
