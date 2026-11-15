@@ -91,14 +91,28 @@ export function readableOn(background: string): string {
 }
 
 export function nearestColorName(hex: string): string {
-  const target = toRgb(hex);
-  let best = "black";
-  let bestDistance = Infinity;
-  for (const [name, value] of Object.entries(PALETTE)) {
-    if (name === "grey") continue;
-    const rgb = toRgb(value);
-    const distance = rgb.reduce((sum, channel, i) => sum + (channel - target[i]) ** 2, 0);
-    if (distance < bestDistance) [best, bestDistance] = [name, distance];
+  const [r, g, b] = toRgb(hex).map((channel) => channel / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const light = (max + min) / 2;
+  const chroma = max - min;
+  const saturation = chroma === 0 ? 0 : chroma / (1 - Math.abs(2 * light - 1));
+  if (saturation < 0.12 || chroma < 0.04) {
+    if (light > 0.9) return "white";
+    if (light > 0.7) return "light gray";
+    if (light > 0.35) return "gray";
+    return light > 0.12 ? "charcoal" : "black";
   }
-  return best;
+  let hue = 0;
+  if (max === r) hue = ((g - b) / chroma) % 6;
+  else if (max === g) hue = (b - r) / chroma + 2;
+  else hue = (r - g) / chroma + 4;
+  hue = (hue * 60 + 360) % 360;
+  const names: [number, string][] = [[12, "red"], [40, "orange"], [65, "yellow"], [165, "green"], [200, "teal"], [238, "blue"], [290, "purple"], [335, "pink"], [360, "red"]];
+  let name = names.find(([limit]) => hue < limit)![1];
+  if ((name === "orange" || name === "yellow") && light < 0.4) name = "brown";
+  if (light > 0.85) return `pale ${name}`;
+  if (light > 0.7) return `light ${name}`;
+  if (light < 0.28 && name !== "brown") return `dark ${name}`;
+  return name;
 }

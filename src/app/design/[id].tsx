@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "convex/react";
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
-import { Asset, requestPermissionsAsync } from "expo-media-library";
+import { requestPermissionsAsync, saveToLibraryAsync } from "expo-media-library/legacy";
 import { router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useEffect, useRef, useState } from "react";
@@ -243,10 +243,11 @@ export default function DesignScreen() {
     try {
       await new Promise((resolve) => setTimeout(resolve, 450));
       const uri = await captureRef(exportRef, { format: "png", quality: 1, result: "tmpfile" });
-      await Asset.create(uri);
+      await saveToLibraryAsync(uri);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setToast(`Saved ${design.name} to Photos`);
-    } catch {
+    } catch (problem) {
+      console.warn("Saving to Photos failed", problem);
       setToast("Couldn't save to Photos. Try again.");
     } finally {
       setExporting(false);
@@ -348,7 +349,7 @@ export default function DesignScreen() {
           </Animated.View>
         )}
         {toast && !preview && !offer && (
-          <Animated.View entering={FadeInDown.springify().damping(18)} exiting={FadeOut.duration(180)} style={styles.bannerWrap}>
+          <Animated.View key={toast} entering={FadeIn.duration(200)} style={styles.bannerWrap}>
             <View testID="edit-toast" style={styles.toast}>
               <View style={styles.toastCheck}>
                 <SymbolView name="checkmark" size={11} tintColor="#fff" weight="bold" />
@@ -483,7 +484,7 @@ const styles = StyleSheet.create({
   offer: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10 },
   offerText: { flex: 1, fontFamily: fonts.semibold, fontSize: 15, color: "#fff" },
   small: { flex: 0, paddingHorizontal: 16, height: 38 },
-  toast: { flexDirection: "row", alignItems: "center", gap: 10, maxWidth: "100%", backgroundColor: colors.ink, borderRadius: 18, paddingVertical: 11, paddingLeft: 12, paddingRight: 14 },
+  toast: { flexDirection: "row", alignItems: "center", gap: 10, alignSelf: "stretch", backgroundColor: colors.ink, borderRadius: 18, paddingVertical: 11, paddingLeft: 12, paddingRight: 14 },
   toastCheck: { width: 20, height: 20, borderRadius: 10, backgroundColor: colors.success, alignItems: "center", justifyContent: "center" },
   toastText: { flexShrink: 1, fontFamily: fonts.semibold, fontSize: 14, color: "#fff" },
   iconButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.canvas, alignItems: "center", justifyContent: "center" },

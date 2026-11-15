@@ -41,7 +41,7 @@ export default function TemplateGallery() {
       <Pressable testID="gallery-back" accessibilityLabel="Back" onPress={() => router.back()} style={styles.close}>
         <SymbolView name="chevron.left" size={15} tintColor={colors.ink} weight="bold" />
       </Pressable>
-      <Text style={styles.title}>Pick a {kind.name.toLowerCase()} to start from</Text>
+      <Text style={styles.title}>Pick {/^[aeiou]/i.test(kind.name) ? "an" : "a"} {kind.name.toLowerCase()} to start from</Text>
       <Text style={styles.sub}>
         {memory?.entries.length ? "It opens with your style already applied." : "You can change every part of it after."}
       </Text>

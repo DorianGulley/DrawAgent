@@ -67,6 +67,22 @@ export function tallyOperations(memory: StyleMemory, doc: AppDoc, operations: Op
   return { ...memory, tallies };
 }
 
+export function untallyOperations(memory: StyleMemory, doc: AppDoc, operations: Operation[]): StyleMemory {
+  const tallies: Tallies = { ...memory.tallies };
+  for (const operation of operations) {
+    if (operation.op !== "setStyle") continue;
+    const node = operation.targets.map((id) => findNode(doc.root, id)).find(Boolean);
+    const category = node && categoryOf(node, operation.prop);
+    const values = category ? tallies[category] : undefined;
+    if (!category || !values) continue;
+    const index = values.lastIndexOf(operation.value);
+    if (index === -1) continue;
+    tallies[category] = [...values.slice(0, index), ...values.slice(index + 1)];
+    if (tallies[category]!.length === 0) delete tallies[category];
+  }
+  return { ...memory, tallies };
+}
+
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.floor((sorted.length - 1) / 2)];

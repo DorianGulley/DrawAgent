@@ -7,7 +7,7 @@ import { loadMemory, saveMemory } from "./style";
 import { findTemplate, kindOf } from "../shared/kinds";
 import { AppDoc } from "../shared/model";
 import { EditError, Operation, applyOperations } from "../shared/operations";
-import { applyProfile, profileOf, tallyOperations } from "../shared/style";
+import { applyProfile, profileOf, tallyOperations, untallyOperations } from "../shared/style";
 
 async function ownedDesign(ctx: MutationCtx, deviceKey: string, designId: Id<"designs">) {
   const ownerHash = await ownerHashFor(deviceKey);
@@ -128,8 +128,10 @@ export const commit = mutation({
       createdAt: Date.now(),
     });
     await ctx.db.patch("designs", designId, { doc: result.doc, position: number, versionCount: number, updatedAt: Date.now() });
-    const { memory } = await loadMemory(ctx, ownerHash);
-    await saveMemory(ctx, ownerHash, tallyOperations(memory, result.doc, result.operations));
+    if (scope !== "everything") {
+      const { memory } = await loadMemory(ctx, ownerHash);
+      await saveMemory(ctx, ownerHash, tallyOperations(memory, result.doc, result.operations));
+    }
     return { ok: true as const, number, changedIds: result.changedIds };
   },
 });
@@ -137,12 +139,15 @@ export const commit = mutation({
 export const undo = mutation({
   args: { deviceKey: v.string(), designId: v.id("designs") },
   handler: async (ctx, { deviceKey, designId }) => {
-    const { design } = await ownedDesign(ctx, deviceKey, designId);
+    const { design, ownerHash } = await ownedDesign(ctx, deviceKey, designId);
     if (design.position <= 0) return null;
     const current = await versionAt(ctx, designId, design.position);
     const previous = await versionAt(ctx, designId, design.position - 1);
     if (!current || !previous) return null;
     await moveTo(ctx, design, previous);
+    if (current.scope === "everything") return { changedIds: current.changedIds, summary: current.summary };
+    const { memory } = await loadMemory(ctx, ownerHash);
+    await saveMemory(ctx, ownerHash, untallyOperations(memory, current.doc as AppDoc, current.operations as Operation[]));
     return { changedIds: current.changedIds, summary: current.summary };
   },
 });
