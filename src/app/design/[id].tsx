@@ -37,6 +37,10 @@ export function DesignEditor({ designId, componentId, base }: { designId: Id<"de
   const versions = useQuery(api.designs.versions, base !== undefined ? { deviceKey: key, designId } : "skip");
   const generateUploadUrl = useMutation(api.feedback.generateUploadUrl);
   const iterate = useMutation(api.clay.iterate);
+  const suggestions = useQuery(api.suggestions.forComponent, componentId ? { deviceKey: key, componentId } : "skip");
+  const requestSuggestions = useMutation(api.suggestions.request);
+  const applySuggestion = useMutation(api.suggestions.apply);
+  const declineSuggestion = useMutation(api.suggestions.decline);
   const frame = useRef<ComponentRef<typeof View>>(null);
   const canvasHandle = useRef<CanvasHandle>(null);
   const [annotating, setAnnotating] = useState<{ frameUri: string; baseNumber: number } | null>(null);
@@ -73,6 +77,8 @@ export function DesignEditor({ designId, componentId, base }: { designId: Id<"de
   const exportRef = useRef<ComponentRef<typeof View>>(null);
 
   const latestRun = part?.runs[0] ?? null;
+  const runActive = latestRun?.status === "queued" || latestRun?.status === "thinking";
+  const suggestion = suggestions?.[0] ?? null;
   useEffect(() => {
     if (!latestRun) return;
     const marker = `${latestRun._id}:${latestRun.status}`;
@@ -82,6 +88,11 @@ export function DesignEditor({ designId, componentId, base }: { designId: Id<"de
     }
     seenRun.current = marker;
   }, [latestRun?._id, latestRun?.status]);
+
+  const workspaceId = part?.workspace._id;
+  useEffect(() => {
+    if (workspaceId) requestSuggestions({ deviceKey: key, workspaceId });
+  }, [workspaceId]);
 
   useEffect(() => {
     if (base === undefined || !versions) return;
@@ -438,6 +449,30 @@ export function DesignEditor({ designId, componentId, base }: { designId: Id<"de
               <Pressable testID="offer-accept" onPress={acceptOffer} style={[styles.bannerButton, styles.small]}>
                 <Text style={styles.bannerButtonText}>Apply</Text>
               </Pressable>
+            </View>
+          </Animated.View>
+        )}
+        {suggestion && !toast && !preview && !offer && !sheetOpen && !editMode && !runActive && (
+          <Animated.View key={suggestion._id} entering={FadeInDown.springify().damping(18)} exiting={FadeOut.duration(160)} style={styles.bannerWrap}>
+            <View testID="suggestion-banner" style={styles.banner}>
+              <Text style={styles.bannerKicker}>Clay suggests{suggestions!.length > 1 ? ` · 1 of ${suggestions!.length}` : ""}</Text>
+              <Text style={styles.bannerText}>{suggestion.title}</Text>
+              {suggestion.reason ? <Text style={styles.runText}>{suggestion.reason}</Text> : null}
+              <View style={styles.bannerRow}>
+                <Pressable testID="suggestion-decline" onPress={() => declineSuggestion({ deviceKey: key, suggestionId: suggestion._id })} style={[styles.bannerButton, styles.bannerGhost]}>
+                  <Text style={styles.bannerGhostText}>Not now</Text>
+                </Pressable>
+                <Pressable
+                  testID="suggestion-apply"
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    applySuggestion({ deviceKey: key, suggestionId: suggestion._id }).catch((problem) => setToast({ text: problem instanceof Error ? problem.message : "Couldn't apply that", error: true }));
+                  }}
+                  style={styles.bannerButton}
+                >
+                  <Text style={styles.bannerButtonText}>Apply</Text>
+                </Pressable>
+              </View>
             </View>
           </Animated.View>
         )}

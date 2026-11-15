@@ -19,6 +19,7 @@ import type * as models from "../models.js";
 import type * as projects from "../projects.js";
 import type * as secrets from "../secrets.js";
 import type * as style from "../style.js";
+import type * as suggestions from "../suggestions.js";
 import type * as workspaces from "../workspaces.js";
 
 import type {
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   projects: typeof projects;
   secrets: typeof secrets;
   style: typeof style;
+  suggestions: typeof suggestions;
   workspaces: typeof workspaces;
 }>;
 

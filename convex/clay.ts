@@ -5,6 +5,7 @@ import { Id } from "./_generated/dataModel";
 import { commitOperations } from "./designs";
 import { cleanText } from "./lib";
 import { recall, remember } from "./memory";
+import { scheduleSuggestions } from "./suggestions";
 import { complete, parseJson } from "./models";
 import { decryptSecret } from "./secrets";
 import { ownedWorkspace, workspaceContext } from "./workspaces";
@@ -111,6 +112,7 @@ export const finish = internalMutation({
     if (!result.ok) return result;
     await ctx.db.patch("agentRuns", runId, { status: "done", message: `Made version ${result.number}`, summary: clean, versionNumber: result.number, updatedAt: Date.now() });
     await ctx.db.patch("workspaces", workspace._id, { updatedAt: Date.now() });
+    await scheduleSuggestions(ctx, workspace, true);
     return result;
   },
 });
@@ -176,7 +178,7 @@ export const run = internalAction({
           await remember(
             data.run.workspaceId,
             [
-              `User (workspace "${data.workspaceName}", marking up the ${data.componentName} at version ${data.run.baseNumber}): ${data.run.note || "(no note)"}`,
+              `User (workspace "${data.workspaceName}", ${data.run.suggestionId ? "accepted Clay's suggestion for" : "marking up"} the ${data.componentName} at version ${data.run.baseNumber}): ${data.run.note || "(no note)"}`,
               data.run.marks.length ? `Marks: ${data.run.marks.map((mark) => `[${mark.tag}] ${mark.text ?? ""} on ${mark.ids.join(", ") || "empty space"}`).join("; ")}` : "",
               `Clay: ${typeof parsed.summary === "string" ? parsed.summary : "made a change"}`,
             ]
@@ -201,7 +203,7 @@ export const run = internalAction({
 });
 
 type LoadResult = {
-  run: { workspaceId: Id<"workspaces">; baseNumber: number; note: string; marks: { tag: string; text?: string; ids: string[] }[] };
+  run: { workspaceId: Id<"workspaces">; baseNumber: number; suggestionId?: Id<"suggestions">; note: string; marks: { tag: string; text?: string; ids: string[] }[] };
   ownerHash: string;
   workspaceName: string;
   kind: string;

@@ -119,6 +119,7 @@ export default defineSchema({
     name: v.string(),
     emoji: v.string(),
     keyId: v.optional(v.id("apiKeys")),
+    suggestedAt: v.optional(v.number()),
     updatedAt: v.number(),
   }).index("by_ownerHash_and_updatedAt", ["ownerHash", "updatedAt"]),
   components: defineTable({
@@ -145,8 +146,23 @@ export default defineSchema({
     summary: v.optional(v.string()),
     versionNumber: v.optional(v.number()),
     model: v.optional(v.string()),
+    suggestionId: v.optional(v.id("suggestions")),
     updatedAt: v.number(),
-  }).index("by_componentId", ["componentId"]),
+  })
+    .index("by_componentId", ["componentId"])
+    .index("by_workspaceId", ["workspaceId"]),
+  suggestions: defineTable({
+    workspaceId: v.id("workspaces"),
+    componentId: v.id("components"),
+    title: v.string(),
+    reason: v.string(),
+    instruction: v.string(),
+    status: v.union(v.literal("pending"), v.literal("applied"), v.literal("declined"), v.literal("stale")),
+    runId: v.optional(v.id("agentRuns")),
+    createdAt: v.number(),
+  })
+    .index("by_componentId_and_status", ["componentId", "status"])
+    .index("by_workspaceId_and_status", ["workspaceId", "status"]),
   styleMemory: defineTable({
     ownerHash: v.string(),
     tallies: v.record(v.string(), v.array(v.union(v.number(), v.string()))),
