@@ -1,0 +1,12 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true
+  },
+  "exclude": [
+    "bin",
+    "cli",
+    "examples",
+    "node_modules"
+  ]
+}
