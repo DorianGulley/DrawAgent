@@ -91,7 +91,7 @@ const RUNTIME = String.raw`
     placeSelection();
     if (!el) { post({ type: 'deselect' }); return; }
     reveal(el);
-    var name = el.querySelector('.d-habit-name, .d-stat-value');
+    var name = el.matches('.d-habit, .d-stat') ? el.querySelector('.d-habit-name, .d-stat-value') : el.children.length ? el.querySelector('.d-heading') : null;
     post({ type: 'select', id: selectedId, nodeType: el.getAttribute('data-direct-type'), label: el.getAttribute('data-direct-label'), text: (name || el).textContent.trim().slice(0, 60) });
   }
   document.addEventListener('click', function(e){
