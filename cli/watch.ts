@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { ConvexClient } from "convex/browser";
 import { api } from "./api";
 import { Id } from "../convex/_generated/dataModel";
@@ -30,11 +30,18 @@ export function agentCommand(config: DirectConfig, configFile: string, prompt: s
     return [
       "codex",
       "exec",
-      "--full-auto",
+      "--sandbox",
+      "workspace-write",
+      "--add-dir",
+      join(dirname(configFile), ".git"),
+      "-c",
+      'approval_policy="never"',
       "-c",
       `mcp_servers.direct.command=${JSON.stringify(process.execPath)}`,
       "-c",
       `mcp_servers.direct.args=[${args}]`,
+      "-c",
+      'mcp_servers.direct.default_tools_approval_mode="approve"',
       prompt,
     ];
   }

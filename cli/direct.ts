@@ -11,6 +11,8 @@ const HELP = `direct: connect a project's coding agent to Direct
 
   direct init --url <live url> [--name <name>] [--agent claude|codex] [--emoji 🌱]
       Register this directory's app with Direct and write ${CONFIG_FILE} (keep it out of git).
+  direct config [--url <live url>] [--agent claude|codex]
+      Change the live URL or agent for this project.
   direct watch [--once]
       Wait for feedback from the phone and launch the configured agent headless for each item.
   direct setup claude|codex
@@ -52,6 +54,15 @@ async function main() {
       const { projectId, key } = await new ConvexHttpClient(convexUrl).mutation(api.projects.create, { name, url: values.url, emoji: values.emoji, agent });
       saveConfig(file, { convexUrl, projectId, key, name, url: values.url, agent });
       console.log(`Connected "${name}" to Direct. It now shows up on your phone.\nWrote ${file} (contains the project key; it is git-ignored only if you ignore it).\nNext: direct watch`);
+      return;
+    }
+    case "config": {
+      const config = loadConfig(file);
+      if (values.agent && values.agent !== "claude" && values.agent !== "codex") throw new Error("--agent must be claude or codex");
+      if (!values.url && !values.agent) throw new Error("Pass --url and/or --agent");
+      await new ConvexHttpClient(config.convexUrl).mutation(api.agent.updateProject, { key: config.key, url: values.url, agent: values.agent });
+      saveConfig(file, { ...config, url: values.url ?? config.url, agent: (values.agent as AgentName | undefined) ?? config.agent });
+      console.log(`Updated "${config.name}".`);
       return;
     }
     case "mcp":

@@ -32,6 +32,19 @@ export const project = query({
   },
 });
 
+export const updateProject = mutation({
+  args: { key: v.string(), url: v.optional(v.string()), agent: v.optional(v.string()) },
+  handler: async (ctx, { key, url, agent }) => {
+    const project = await projectForKey(ctx, key);
+    await ctx.db.patch("projects", project._id, {
+      ...(url ? { url: cleanUrl(url) } : {}),
+      ...(agent ? { agent: cleanText(agent, 20) } : {}),
+      updatedAt: Date.now(),
+    });
+    return null;
+  },
+});
+
 export const pending = query({
   args: { key: v.string() },
   handler: async (ctx, { key }) => {
