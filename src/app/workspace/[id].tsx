@@ -44,7 +44,7 @@ function PartCard({ part, index }: { part: Part; index: number }) {
   const removeComponent = useMutation(api.workspaces.removeComponent);
   const [usage, setUsage] = useState(part.usage);
   const isApp = part.role === "app";
-  const versions = part.design ? part.design.versionCount : (part.project?.versionCount ?? 0);
+  const versions = part.design ? part.design.position : (part.project?.versionCount ?? 0);
   const updatedAt = part.design?.updatedAt ?? part.project?.updatedAt ?? part._creationTime;
   const running = part.run?.status === "thinking";
 
@@ -73,7 +73,7 @@ function PartCard({ part, index }: { part: Part; index: number }) {
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={styles.role}>{ROLE_LABEL[part.role]}{part.project ? " · live" : ""}</Text>
             <Text style={styles.partName}>{part.name}</Text>
-            <Text style={styles.meta}>v{versions} · {timeAgo(updatedAt)}</Text>
+            <Text style={styles.meta}>{versions ? `v${versions}` : "Original"} · {timeAgo(updatedAt)}</Text>
             {running ? (
               <View style={styles.runRow}>
                 <ActivityIndicator size="small" color={colors.accent} />

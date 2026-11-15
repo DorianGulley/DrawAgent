@@ -9,7 +9,6 @@ import { ActivityIndicator, KeyboardAvoidingView, Modal, Pressable, ScrollView, 
 import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut, FadeOutDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { captureRef } from "react-native-view-shot";
-import { WebView } from "react-native-webview";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { interpret, interpretProject } from "../../../shared/interpreter";
@@ -71,7 +70,7 @@ export function DesignEditor({ designId, componentId, base }: { designId: Id<"de
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sheetHeight, setSheetHeight] = useState(0);
   const [exporting, setExporting] = useState(false);
-  const exportRef = useRef<WebView>(null);
+  const exportRef = useRef<ComponentRef<typeof View>>(null);
 
   const latestRun = part?.runs[0] ?? null;
   useEffect(() => {
@@ -335,8 +334,8 @@ export function DesignEditor({ designId, componentId, base }: { designId: Id<"de
   return (
     <View style={styles.fill}>
       {exporting && (
-        <View pointerEvents="none" style={[styles.exportFrame, { width: exportWidth, height: exportHeight }]}>
-          <DesignCanvas testID="export-canvas" viewRef={exportRef} doc={design.doc as AppDoc} kind={kind} exporting interactive={false} onReady={capture} style={{ flex: 1 }} />
+        <View ref={exportRef} collapsable={false} pointerEvents="none" style={[styles.exportFrame, { width: exportWidth, height: exportHeight }]}>
+          <DesignCanvas testID="export-canvas" doc={design.doc as AppDoc} kind={kind} exporting interactive={false} onReady={capture} style={{ flex: 1 }} />
         </View>
       )}
       <View ref={frame} collapsable={false} style={StyleSheet.absoluteFill}>
@@ -518,6 +517,7 @@ export function DesignEditor({ designId, componentId, base }: { designId: Id<"de
           <Annotator
             frameUri={annotating.frameUri}
             agentName="Clay"
+            subject={`your ${kind.name.toLowerCase()}`}
             heading={annotating.baseNumber !== design.position ? `Marking up version ${annotating.baseNumber}` : undefined}
             hitTest={(probes) => canvasHandle.current?.hitTest(probes) ?? Promise.resolve(probes.map(() => []))}
             onCancel={() => {

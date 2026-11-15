@@ -36,6 +36,7 @@ interface Props {
   onSubmit: (input: { note: string; marks: Mark[]; imageUri: string }) => Promise<void>;
   agentName?: string;
   heading?: string;
+  subject?: string;
 }
 
 function probeFor(kind: Tool, points: Point[]): Probe {
@@ -119,7 +120,7 @@ function Flash() {
   return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: "#fff" }, style]} />;
 }
 
-export function Annotator({ frameUri, hitTest, onCancel, onSubmit, agentName = "your agent", heading }: Props) {
+export function Annotator({ frameUri, hitTest, onCancel, onSubmit, agentName = "your agent", heading, subject = "your app" }: Props) {
   const insets = useSafeAreaInsets();
   const canvas = useRef<ComponentRef<typeof View>>(null);
   const [marks, setMarks] = useState<Mark[]>([]);
@@ -219,7 +220,7 @@ export function Annotator({ frameUri, hitTest, onCancel, onSubmit, agentName = "
         </Pressable>
         <View style={styles.hint}>
           <View style={[styles.hintDot, { backgroundColor: TAG_COLORS[tag] }]} />
-          <Text style={styles.hintText}>{marks.length === 0 ? "Draw on your app" : `${marks.length} mark${marks.length === 1 ? "" : "s"}`}</Text>
+          <Text style={styles.hintText}>{marks.length === 0 ? `Draw on ${subject}` : `${marks.length} mark${marks.length === 1 ? "" : "s"}`}</Text>
         </View>
         <Pressable
           testID="annotate-undo"
