@@ -9,9 +9,11 @@
  */
 
 import type * as agent from "../agent.js";
+import type * as designs from "../designs.js";
 import type * as feedback from "../feedback.js";
 import type * as lib from "../lib.js";
 import type * as projects from "../projects.js";
+import type * as style from "../style.js";
 
 import type {
   ApiFromModules,
@@ -21,9 +23,11 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   agent: typeof agent;
+  designs: typeof designs;
   feedback: typeof feedback;
   lib: typeof lib;
   projects: typeof projects;
+  style: typeof style;
 }>;
 
 /**

@@ -27,7 +27,15 @@
       "expo-router",
       "expo-status-bar",
       "expo-font",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      "expo-secure-store",
+      [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "Direct saves your lock screens and logos to Photos.",
+          "photosPermission": "Direct saves your lock screens and logos to Photos."
+        }
+      ]
     ],
     "scheme": "direct",
     "experiments": {

@@ -7,11 +7,39 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "../../convex/_generated/api";
 import { FunctionReturnType } from "convex/server";
+import { KINDS, KIND_ORDER } from "../../shared/kinds";
+import { AppDoc } from "../../shared/model";
 import { agentLabel } from "../components/AgentStatus";
+import { DesignThumb } from "../components/DesignThumb";
+import { deviceKey } from "../device";
 import { LiveApp } from "../components/LiveApp";
 import { colors, fonts, timeAgo } from "../theme";
 
 type Project = FunctionReturnType<typeof api.projects.list>[number];
+type Design = FunctionReturnType<typeof api.designs.list>[number];
+
+function DesignCard({ design }: { design: Design }) {
+  const kind = KINDS[design.kind];
+  const width = kind.id === "logo" ? 150 : 160;
+  const height = kind.id === "logo" ? 150 : 250;
+  return (
+    <Pressable
+      testID={`design-${design.name}`}
+      accessibilityLabel={`Open ${design.name}`}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        router.push({ pathname: "/design/[id]", params: { id: design._id } });
+      }}
+      style={({ pressed }) => [styles.designCard, { width }, pressed && { transform: [{ scale: 0.98 }] }]}
+    >
+      <DesignThumb key={design.updatedAt} doc={design.doc as AppDoc} kind={kind} width={width} height={height} style={{ backgroundColor: "#ECE8E0" }} />
+      <View style={{ padding: 10 }}>
+        <Text numberOfLines={1} style={styles.designTitle}>{design.emoji} {design.name}</Text>
+        <Text style={styles.cardMeta}>{timeAgo(design.updatedAt)}</Text>
+      </View>
+    </Pressable>
+  );
+}
 
 const PREVIEW_SCALE = 0.6;
 
@@ -65,6 +93,7 @@ function ProjectCard({ project, index }: { project: Project; index: number }) {
 export default function Home() {
   const insets = useSafeAreaInsets();
   const projects = useQuery(api.projects.list);
+  const designs = useQuery(api.designs.list, { deviceKey: deviceKey() });
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.canvas }} contentContainerStyle={{ paddingTop: insets.top + 18, paddingBottom: insets.bottom + 40 }}>
@@ -76,13 +105,51 @@ export default function Home() {
           </View>
         </View>
         <Text style={styles.lede}>
-          Draw on your app.{"\n"}
-          <Text style={{ fontFamily: fonts.displayItalic, color: colors.ink }}>Your agent ships it.</Text>
+          Make it yours.{"\n"}
+          <Text style={{ fontFamily: fonts.displayItalic, color: colors.ink }}>Or direct your agent.</Text>
         </Text>
+        <View style={styles.actions}>
+          <Pressable testID="new-design" onPress={() => router.push("/new")} style={[styles.action, styles.actionPrimary]}>
+            <SymbolView name="plus" size={15} tintColor="#fff" weight="bold" />
+            <Text style={[styles.actionText, { color: "#fff" }]}>New</Text>
+          </Pressable>
+          <Pressable testID="your-style" onPress={() => router.push("/style")} style={styles.action}>
+            <SymbolView name="paintpalette" size={15} tintColor={colors.ink} />
+            <Text style={styles.actionText}>Your style</Text>
+          </Pressable>
+        </View>
       </Animated.View>
 
+      {designs === undefined ? (
+        <View style={[styles.loading, { height: 120 }]}>
+          <ActivityIndicator color={colors.inkSoft} />
+        </View>
+      ) : designs.length === 0 ? (
+        <Pressable testID="make-empty" onPress={() => router.push("/new")} style={[styles.empty, { marginBottom: 30 }]}>
+          <Text style={styles.emptyTitle}>Make something</Text>
+          <Text style={styles.emptyText}>Start an app, a lock screen, or a logo from a ready-made design, then change anything by tapping it.</Text>
+        </Pressable>
+      ) : (
+        KIND_ORDER.filter((id) => designs.some((design) => design.kind === id)).map((id) => {
+          const group = designs.filter((design) => design.kind === id);
+          return (
+            <View key={id} style={{ marginBottom: 26 }}>
+              <View style={styles.sectionRow}>
+                <Text style={styles.sectionLabel}>{KINDS[id].plural}</Text>
+                <Text style={styles.sectionCount}>{group.length}</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingHorizontal: 20 }}>
+                {group.map((design) => (
+                  <DesignCard key={design._id} design={design} />
+                ))}
+              </ScrollView>
+            </View>
+          );
+        })
+      )}
+
       <View style={styles.sectionRow}>
-        <Text style={styles.sectionLabel}>Your apps</Text>
+        <Text style={styles.sectionLabel}>Connected apps</Text>
         {projects && <Text style={styles.sectionCount}>{projects.length}</Text>}
       </View>
 
@@ -115,6 +182,12 @@ const styles = StyleSheet.create({
   avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center" },
   avatarText: { color: "#fff", fontFamily: fonts.semibold, fontSize: 15 },
   lede: { fontFamily: fonts.display, fontSize: 30, lineHeight: 34, color: colors.inkSoft, marginTop: 14, letterSpacing: -0.3 },
+  actions: { flexDirection: "row", gap: 10, marginTop: 20 },
+  action: { flexDirection: "row", alignItems: "center", gap: 7, height: 42, paddingHorizontal: 16, borderRadius: 21, backgroundColor: colors.surface },
+  actionPrimary: { backgroundColor: colors.ink },
+  actionText: { fontFamily: fonts.semibold, fontSize: 15, color: colors.ink },
+  designCard: { borderRadius: 20, backgroundColor: colors.surface, overflow: "hidden" },
+  designTitle: { fontFamily: fonts.semibold, fontSize: 15, color: colors.ink },
   sectionRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 20, marginBottom: 14 },
   sectionLabel: { fontFamily: fonts.semibold, fontSize: 13, color: colors.muted, textTransform: "uppercase", letterSpacing: 1.1 },
   sectionCount: { fontFamily: fonts.semibold, fontSize: 12, color: colors.muted, backgroundColor: colors.line, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8, overflow: "hidden" },

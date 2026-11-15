@@ -32,6 +32,10 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="project/[id]" options={{ animation: "fade_from_bottom", gestureEnabled: false }} />
+        <Stack.Screen name="design/[id]" options={{ animation: "fade_from_bottom", gestureEnabled: false }} />
+        <Stack.Screen name="new/index" options={{ animation: "slide_from_bottom" }} />
+        <Stack.Screen name="new/[kind]" />
+        <Stack.Screen name="style" />
       </Stack>
     </ConvexProvider>
   );

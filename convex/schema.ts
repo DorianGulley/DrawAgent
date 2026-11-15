@@ -9,6 +9,14 @@ export const feedbackStatus = v.union(
   v.literal("failed"),
 );
 
+export const designScope = v.union(
+  v.literal("start"),
+  v.literal("one"),
+  v.literal("many"),
+  v.literal("everything"),
+  v.literal("example"),
+);
+
 export const elementInfo = v.object({
   selector: v.string(),
   tag: v.string(),
@@ -68,4 +76,32 @@ export default defineSchema({
     afterImageId: v.optional(v.id("_storage")),
     createdAt: v.number(),
   }).index("by_projectId_and_number", ["projectId", "number"]),
+  designs: defineTable({
+    ownerHash: v.string(),
+    kind: v.string(),
+    templateId: v.string(),
+    name: v.string(),
+    emoji: v.string(),
+    doc: v.any(),
+    position: v.number(),
+    versionCount: v.number(),
+    updatedAt: v.number(),
+  }).index("by_ownerHash_and_updatedAt", ["ownerHash", "updatedAt"]),
+  designVersions: defineTable({
+    designId: v.id("designs"),
+    number: v.number(),
+    doc: v.any(),
+    summary: v.string(),
+    operations: v.any(),
+    changedIds: v.array(v.string()),
+    scope: designScope,
+    instruction: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_designId_and_number", ["designId", "number"]),
+  styleMemory: defineTable({
+    ownerHash: v.string(),
+    tallies: v.record(v.string(), v.array(v.union(v.number(), v.string()))),
+    overrides: v.record(v.string(), v.union(v.number(), v.string())),
+    updatedAt: v.number(),
+  }).index("by_ownerHash", ["ownerHash"]),
 });
