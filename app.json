@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Direct",
+    "name": "Clay",
     "slug": "direct",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -12,7 +12,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#C65A35",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -27,24 +27,26 @@
       "expo-router",
       "expo-status-bar",
       "expo-font",
-      "expo-splash-screen",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "backgroundColor": "#F3EEE6"
+        }
+      ],
       "expo-secure-store",
       [
         "expo-media-library",
         {
-          "savePhotosPermission": "Direct saves your lock screens and logos to Photos.",
-          "photosPermission": "Direct saves your lock screens and logos to Photos."
+          "savePhotosPermission": "Clay saves your lock screens and logos to Photos.",
+          "photosPermission": "Clay saves your lock screens and logos to Photos."
         }
       ]
     ],
     "scheme": "direct",
     "experiments": {
       "typedRoutes": true
-    },
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#F5F3EE"
     }
   }
 }
