@@ -163,6 +163,18 @@ export default defineSchema({
     height: v.optional(v.number()),
     createdAt: v.number(),
   }).index("by_workspaceId", ["workspaceId"]),
+  shares: defineTable({
+    slug: v.string(),
+    workspaceId: v.id("workspaces"),
+    componentId: v.id("components"),
+    name: v.string(),
+    kind: v.string(),
+    doc: v.any(),
+    versionNumber: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_componentId", ["componentId"]),
   suggestions: defineTable({
     workspaceId: v.id("workspaces"),
     componentId: v.id("components"),

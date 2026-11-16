@@ -5,7 +5,7 @@ import { requestPermissionsAsync, saveToLibraryAsync } from "expo-media-library/
 import { router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { ComponentRef, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut, FadeOutDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { captureRef } from "react-native-view-shot";
@@ -77,6 +77,8 @@ export function DesignEditor({ designId, componentId, base }: { designId: Id<"de
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sheetHeight, setSheetHeight] = useState(0);
   const [exporting, setExporting] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const publishShare = useMutation(api.shares.publish);
   const exportRef = useRef<ComponentRef<typeof View>>(null);
 
   const latestRun = part?.runs[0] ?? null;
@@ -284,6 +286,22 @@ export function DesignEditor({ designId, componentId, base }: { designId: Id<"de
     setExporting(true);
   };
 
+  const share = async () => {
+    if (!componentId || sharing) return;
+    setSharing(true);
+    try {
+      const slug = await publishShare({ deviceKey: key, componentId });
+      const site = process.env.EXPO_PUBLIC_CONVEX_SITE_URL ?? process.env.EXPO_PUBLIC_CONVEX_URL!.replace(".convex.cloud", ".convex.site");
+      const url = `${site}/s/${slug}`;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await Share.share({ url, message: `Take a look at ${design.name}, made with Clay: ${url}` });
+    } catch (problem) {
+      setToast({ text: problem instanceof Error ? problem.message.replace(/^.*Uncaught Error: /s, "").split("\n")[0] : "Couldn't share that", error: true });
+    } finally {
+      setSharing(false);
+    }
+  };
+
   const capture = async () => {
     try {
       await new Promise((resolve) => setTimeout(resolve, 450));
@@ -389,6 +407,13 @@ export function DesignEditor({ designId, componentId, base }: { designId: Id<"de
                 <SymbolView name="clock.arrow.trianglehead.counterclockwise.rotate.90" size={16} tintColor={colors.ink} weight="semibold" />
               </BlurView>
             </Pressable>
+            {!kind.export && (
+              <Pressable testID="share-button" accessibilityLabel="Share this app" onPress={share}>
+                <BlurView intensity={60} tint="light" style={styles.circle}>
+                  {sharing ? <ActivityIndicator color={colors.ink} /> : <SymbolView name="square.and.arrow.up" size={16} tintColor={colors.ink} weight="semibold" />}
+                </BlurView>
+              </Pressable>
+            )}
             {kind.export && (
               <Pressable testID="export-button" accessibilityLabel={kind.export.label} onPress={save}>
                 <BlurView intensity={60} tint="light" style={styles.circle}>
