@@ -40,7 +40,7 @@
         "expo-media-library",
         {
           "savePhotosPermission": "Clay saves your logos and icons to Photos.",
-          "photosPermission": "Clay saves your logos and icons to Photos."
+          "photosPermission": "Clay uses your photos in the apps you build and saves your logos and icons to Photos."
         }
       ],
       [

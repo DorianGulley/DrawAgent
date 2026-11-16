@@ -97,6 +97,8 @@ function PartCard({ part, index }: { part: Part; index: number }) {
             onChangeText={setUsage}
             onEndEditing={() => usage !== part.usage && updateComponent({ deviceKey: key, componentId: part._id, usage })}
             multiline
+            returnKeyType="done"
+            submitBehavior="blurAndSubmit"
             placeholder="Where this part shows up, so Clay keeps everything consistent"
             placeholderTextColor={colors.muted}
             style={styles.usage}
@@ -172,7 +174,6 @@ export default function WorkspaceScreen() {
   const key = deviceKey();
   const workspaceId = id as Id<"workspaces">;
   const workspace = useQuery(api.workspaces.get, { deviceKey: key, workspaceId });
-  const keys = useQuery(api.keys.list, { deviceKey: key });
   const update = useMutation(api.workspaces.update);
   const addComponent = useMutation(api.workspaces.addComponent);
   const remove = useMutation(api.workspaces.remove);
@@ -187,15 +188,6 @@ export default function WorkspaceScreen() {
   if (workspace === null) return <Redirect href="/" />;
 
   const missing = (["logo", "icon"] as const).filter((role) => !workspace.components.some((part) => part.role === role));
-
-  const pickKey = () => {
-    const options = [...(keys ?? []).map((item) => `${item.label} (•••• ${item.last4})`), "Add a key…", "Cancel"];
-    ActionSheetIOS.showActionSheetWithOptions({ title: "Model key for this workspace", options, cancelButtonIndex: options.length - 1 }, (choice) => {
-      if (choice === options.length - 1) return;
-      if (choice === options.length - 2) return router.push("/settings");
-      update({ deviceKey: key, workspaceId, keyId: keys![choice]._id });
-    });
-  };
 
   const addPart = () => {
     const options = [...missing.map((role) => ROLE_LABEL[role]), "Cancel"];
@@ -224,7 +216,7 @@ export default function WorkspaceScreen() {
     });
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.canvas }} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 40, paddingHorizontal: 20 }}>
+    <ScrollView keyboardDismissMode="interactive" style={{ flex: 1, backgroundColor: colors.canvas }} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 40, paddingHorizontal: 20 }}>
       <View style={styles.topRow}>
         <Pressable testID="workspace-back" accessibilityLabel="Back" onPress={() => router.back()} style={styles.circle}>
           <SymbolView name="chevron.left" size={15} tintColor={colors.ink} weight="bold" />
@@ -239,13 +231,6 @@ export default function WorkspaceScreen() {
           <Text style={{ fontSize: 30 }}>{workspace.emoji}</Text>
         </View>
         <Text style={styles.title}>{workspace.name}</Text>
-        <Pressable testID="workspace-key" onPress={pickKey} style={[styles.keyChip, !workspace.key && { backgroundColor: "#FDECE8" }]}>
-          <SymbolView name="key.fill" size={12} tintColor={workspace.key ? colors.accent : colors.danger} />
-          <Text style={[styles.keyText, !workspace.key && { color: colors.danger }]}>
-            {workspace.key ? `${workspace.key.label} · ${workspace.key.model}` : "Pick a model key"}
-          </Text>
-          <SymbolView name="chevron.down" size={10} tintColor={colors.muted} weight="bold" />
-        </Pressable>
       </Animated.View>
 
       <View style={{ gap: 16, marginTop: 24 }}>
@@ -272,8 +257,6 @@ const styles = StyleSheet.create({
   hero: { alignItems: "flex-start", marginTop: 18, gap: 10 },
   emojiWell: { width: 60, height: 60, borderRadius: 20, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
   title: { fontFamily: fonts.display, fontSize: 44, color: colors.ink, letterSpacing: -0.4 },
-  keyChip: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, backgroundColor: colors.accentSoft },
-  keyText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.accent },
   card: { backgroundColor: colors.surface, borderRadius: 26, padding: 14, gap: 12, shadowColor: "#1A1408", shadowOpacity: 0.06, shadowRadius: 18, shadowOffset: { width: 0, height: 8 } },
   cardTop: { flexDirection: "row", gap: 14 },
   preview: { borderRadius: 16, overflow: "hidden" },

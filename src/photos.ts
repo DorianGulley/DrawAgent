@@ -1,4 +1,5 @@
 import { useAction, useMutation } from "convex/react";
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { ActionSheetIOS } from "react-native";
 import { api } from "../convex/_generated/api";
@@ -6,6 +7,7 @@ import { Id } from "../convex/_generated/dataModel";
 import { deviceKey } from "./device";
 
 const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_SIDE = 2048;
 
 export type PhotoSource = "library" | "camera";
 
@@ -23,16 +25,19 @@ export function usePhotoUpload(workspaceId: Id<"workspaces"> | undefined) {
 
   return async (source: PhotoSource): Promise<{ id: Id<"assets">; uri: string } | null> => {
     if (!workspaceId) return null;
-    const permission = source === "camera" ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) throw new Error(source === "camera" ? "Allow camera access in Settings to take a photo." : "Allow photo access in Settings to add photos.");
+    if (source === "camera" && !(await ImagePicker.requestCameraPermissionsAsync()).granted) throw new Error("Allow camera access in Settings to take a photo.");
     const options: ImagePicker.ImagePickerOptions = { mediaTypes: ["images"], quality: 0.82, allowsEditing: false, exif: false };
     const result = source === "camera" ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
     if (result.canceled || !result.assets[0]) return null;
     const picked = result.assets[0];
     if (picked.fileSize && picked.fileSize > MAX_BYTES) throw new Error("Photos can be up to 10 MB");
-    const blob = await (await fetch(picked.uri)).blob();
+    const context = ImageManipulator.manipulate(picked.uri);
+    const scale = Math.min(1, MAX_SIDE / Math.max(picked.width, picked.height));
+    if (scale < 1) context.resize({ width: Math.round(picked.width * scale), height: Math.round(picked.height * scale) });
+    const rendered = await (await context.renderAsync()).saveAsync({ format: SaveFormat.JPEG, compress: 0.82 });
+    const blob = await (await fetch(rendered.uri)).blob();
     if (blob.size > MAX_BYTES) throw new Error("Photos can be up to 10 MB");
-    const response = await fetch(await generateUploadUrl(), { method: "POST", headers: { "Content-Type": picked.mimeType ?? "image/jpeg" }, body: blob });
+    const response = await fetch(await generateUploadUrl(), { method: "POST", headers: { "Content-Type": "image/jpeg" }, body: blob });
     if (!response.ok) throw new Error("The upload didn't go through");
     const { storageId } = (await response.json()) as { storageId: Id<"_storage"> };
     const id = await add({
@@ -40,10 +45,10 @@ export function usePhotoUpload(workspaceId: Id<"workspaces"> | undefined) {
       workspaceId,
       storageId,
       name: (picked.fileName ?? "Photo").replace(/\.[a-z0-9]+$/i, ""),
-      width: picked.width,
-      height: picked.height,
+      width: rendered.width,
+      height: rendered.height,
     });
-    return { id, uri: picked.uri };
+    return { id, uri: rendered.uri };
   };
 }
 

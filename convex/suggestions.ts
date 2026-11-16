@@ -5,7 +5,6 @@ import { Doc, Id } from "./_generated/dataModel";
 import { cleanText, ownerHashFor } from "./lib";
 import { recall, remember } from "./memory";
 import { complete, parseJson } from "./models";
-import { decryptSecret } from "./secrets";
 import { componentsOf, ownedWorkspace, workspaceContext } from "./workspaces";
 
 const COOLDOWN_MS = 2 * 60 * 1000;
@@ -18,7 +17,6 @@ async function ownedSuggestion(ctx: MutationCtx, deviceKey: string, suggestionId
 }
 
 export async function scheduleSuggestions(ctx: MutationCtx, workspace: Doc<"workspaces">, force = false) {
-  if (!workspace.keyId) return;
   if (!force && workspace.suggestedAt && Date.now() - workspace.suggestedAt < COOLDOWN_MS) return;
   await ctx.db.patch("workspaces", workspace._id, { suggestedAt: Date.now() });
   await ctx.scheduler.runAfter(0, internal.suggestions.generate, { workspaceId: workspace._id });
@@ -62,7 +60,6 @@ export const apply = mutation({
   handler: async (ctx, { deviceKey, suggestionId }) => {
     const { suggestion, workspace } = await ownedSuggestion(ctx, deviceKey, suggestionId);
     if (suggestion.status !== "pending") return null;
-    if (!workspace.keyId) throw new Error("Pick an API key for this workspace first");
     const component = await ctx.db.get("components", suggestion.componentId);
     const design = component?.designId ? await ctx.db.get("designs", component.designId) : null;
     if (!component || !design) throw new Error("That part is gone");
@@ -111,9 +108,7 @@ export const load = internalQuery({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, { workspaceId }) => {
     const workspace = await ctx.db.get("workspaces", workspaceId);
-    if (!workspace?.keyId) return null;
-    const key = await ctx.db.get("apiKeys", workspace.keyId);
-    if (!key) return null;
+    if (!workspace) return null;
     const parts = (await componentsOf(ctx, workspaceId)).filter((component) => component.designId);
     const runs = await ctx.db
       .query("agentRuns")
@@ -134,7 +129,6 @@ export const load = internalQuery({
         .filter((run) => run.status === "done")
         .map((run) => `${names.get(run.componentId) ?? "a part"}: asked "${run.note || "(marks only)"}" → ${run.summary ?? ""}`),
       declined: past.map((row) => `${names.get(row.componentId) ?? "a part"}: ${row.title}`),
-      key: { provider: key.provider, model: key.model, ciphertext: key.ciphertext, iv: key.iv },
     };
   },
 });
@@ -189,8 +183,7 @@ export const generate = internalAction({
       "\nAnswer in JSON.",
     ].join("\n");
     try {
-      const apiKey = await decryptSecret(data.key.ciphertext, data.key.iv);
-      const answer = await complete(data.key.provider, apiKey, data.key.model, SYSTEM, request, []);
+      const answer = await complete(SYSTEM, request, []);
       const parsed = parseJson(answer) as { suggestions?: unknown };
       const items = (Array.isArray(parsed.suggestions) ? parsed.suggestions : [])
         .filter((item): item is { partId: string; title: string; reason: string; instruction: string } =>

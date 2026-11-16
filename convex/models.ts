@@ -1,78 +1,30 @@
-export type Provider = "openai" | "anthropic";
+export const MODEL = process.env.CLAY_MODEL || "gpt-5.5";
 
-const OPENAI_PREFERENCE = [/^gpt-5\.5$/, /^gpt-5\.4$/, /^gpt-5\.2$/, /^gpt-5\.1$/, /^gpt-5$/, /^gpt-4\.1$/, /^gpt-4o$/];
-
-export async function verifyKey(provider: Provider, apiKey: string): Promise<string> {
-  if (provider === "openai") {
-    const response = await fetch("https://api.openai.com/v1/models", { headers: { Authorization: `Bearer ${apiKey}` } });
-    if (response.status === 401) throw new Error("OpenAI didn't accept that key");
-    if (!response.ok) throw new Error(`OpenAI answered ${response.status}`);
-    const ids = ((await response.json()) as { data: { id: string }[] }).data.map((model) => model.id);
-    for (const pattern of OPENAI_PREFERENCE) {
-      const found = ids.find((id) => pattern.test(id));
-      if (found) return found;
-    }
-    throw new Error("This OpenAI key has no GPT model Clay can use");
-  }
-  const response = await fetch("https://api.anthropic.com/v1/models?limit=100", {
-    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-  });
-  if (response.status === 401) throw new Error("Anthropic didn't accept that key");
-  if (!response.ok) throw new Error(`Anthropic answered ${response.status}`);
-  const models = ((await response.json()) as { data: { id: string; created_at: string }[] }).data;
-  const pick = (family: string) =>
-    models.filter((model) => model.id.includes(family)).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
-  const chosen = pick("sonnet") ?? pick("opus") ?? models[0];
-  if (!chosen) throw new Error("This Anthropic key has no Claude model Clay can use");
-  return chosen.id;
-}
-
-export async function complete(
-  provider: Provider,
-  apiKey: string,
-  model: string,
-  system: string,
-  user: string,
-  images: string[],
-  maxTokens = 8000,
-): Promise<string> {
-  if (provider === "openai") {
-    const content: unknown[] = [{ type: "input_text", text: user }];
-    for (const url of images) content.push({ type: "input_image", image_url: url });
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        instructions: system,
-        input: [{ role: "user", content }],
-        text: { format: { type: "json_object" } },
-        max_output_tokens: maxTokens * 4,
-      }),
-    });
-    const body = (await response.json()) as { error?: { message: string }; output?: { type: string; content?: { type: string; text?: string }[] }[] };
-    if (!response.ok) throw new Error(body.error?.message ?? `OpenAI answered ${response.status}`);
-    const text = (body.output ?? [])
-      .filter((item) => item.type === "message")
-      .flatMap((item) => item.content ?? [])
-      .filter((part) => part.type === "output_text")
-      .map((part) => part.text ?? "")
-      .join("");
-    if (!text) throw new Error("OpenAI returned no answer");
-    return text;
-  }
-  const content: unknown[] = [];
-  for (const url of images) content.push({ type: "image", source: { type: "url", url } });
-  content.push({ type: "text", text: user });
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+export async function complete(system: string, user: string, images: string[], maxTokens = 8000): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("Clay's model key isn't set up on the server");
+  const content: unknown[] = [{ type: "input_text", text: user }];
+  for (const url of images) content.push({ type: "input_image", image_url: url });
+  const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
-    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
-    body: JSON.stringify({ model, max_tokens: maxTokens, system, messages: [{ role: "user", content }] }),
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: MODEL,
+      instructions: system,
+      input: [{ role: "user", content }],
+      text: { format: { type: "json_object" } },
+      max_output_tokens: maxTokens * 4,
+    }),
   });
-  const body = (await response.json()) as { error?: { message: string }; content?: { type: string; text?: string }[] };
-  if (!response.ok) throw new Error(body.error?.message ?? `Anthropic answered ${response.status}`);
-  const text = (body.content ?? []).filter((part) => part.type === "text").map((part) => part.text ?? "").join("");
-  if (!text) throw new Error("Claude returned no answer");
+  const body = (await response.json()) as { error?: { message: string }; output?: { type: string; content?: { type: string; text?: string }[] }[] };
+  if (!response.ok) throw new Error(body.error?.message ?? `OpenAI answered ${response.status}`);
+  const text = (body.output ?? [])
+    .filter((item) => item.type === "message")
+    .flatMap((item) => item.content ?? [])
+    .filter((part) => part.type === "output_text")
+    .map((part) => part.text ?? "")
+    .join("");
+  if (!text) throw new Error("The model returned no answer");
   return text;
 }
 

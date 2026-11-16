@@ -117,10 +117,8 @@ export const get = query({
     const ownerHash = await ownerHashFor(deviceKey);
     const workspace = await ctx.db.get("workspaces", workspaceId);
     if (!workspace || workspace.ownerHash !== ownerHash) return null;
-    const key = workspace.keyId ? await ctx.db.get("apiKeys", workspace.keyId) : null;
     return {
       ...workspace,
-      key: key ? { _id: key._id, provider: key.provider, label: key.label, last4: key.last4, model: key.model } : null,
       components: await Promise.all((await componentsOf(ctx, workspaceId)).map((component) => hydrate(ctx, component))),
     };
   },
@@ -141,7 +139,7 @@ export const component = query({
       .take(10);
     return {
       ...(await hydrate(ctx, component)),
-      workspace: { _id: workspace._id, name: workspace.name, emoji: workspace.emoji, hasKey: Boolean(workspace.keyId) },
+      workspace: { _id: workspace._id, name: workspace.name, emoji: workspace.emoji },
       runs: runs.map(({ _id, status, message, summary, versionNumber, note, updatedAt, baseNumber }) => ({ _id, status, message, summary, versionNumber, note, updatedAt, baseNumber })),
     };
   },
@@ -171,7 +169,6 @@ export const create = mutation({
     deviceKey: v.string(),
     name: v.string(),
     emoji: v.string(),
-    keyId: v.optional(v.id("apiKeys")),
     appProjectId: v.optional(v.id("projects")),
     appTemplateId: v.optional(v.string()),
     appPrompt: v.optional(v.string()),
@@ -180,20 +177,14 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const ownerHash = await ownerHashFor(args.deviceKey);
-    if (args.keyId) {
-      const key = await ctx.db.get("apiKeys", args.keyId);
-      if (!key || key.ownerHash !== ownerHash) throw new Error("Key not found");
-    }
     const workspaceId = await ctx.db.insert("workspaces", {
       ownerHash,
       name: cleanText(args.name, 40) || "Untitled",
       emoji: cleanText(args.emoji, 8) || "🏺",
-      keyId: args.keyId,
       updatedAt: Date.now(),
     });
     const prompt = cleanText(args.appPrompt ?? "", 1200);
     if (prompt) {
-      if (!args.keyId) throw new Error("Pick a model key so Clay can build the app");
       const doc: AppDoc = {
         schemaVersion: 1,
         root: {
@@ -268,17 +259,12 @@ export const removeComponent = mutation({
 });
 
 export const update = mutation({
-  args: { deviceKey: v.string(), workspaceId: v.id("workspaces"), name: v.optional(v.string()), emoji: v.optional(v.string()), keyId: v.optional(v.union(v.id("apiKeys"), v.null())) },
-  handler: async (ctx, { deviceKey, workspaceId, name, emoji, keyId }) => {
-    const { ownerHash } = await ownedWorkspace(ctx, deviceKey, workspaceId);
-    if (keyId) {
-      const key = await ctx.db.get("apiKeys", keyId);
-      if (!key || key.ownerHash !== ownerHash) throw new Error("Key not found");
-    }
+  args: { deviceKey: v.string(), workspaceId: v.id("workspaces"), name: v.optional(v.string()), emoji: v.optional(v.string()) },
+  handler: async (ctx, { deviceKey, workspaceId, name, emoji }) => {
+    await ownedWorkspace(ctx, deviceKey, workspaceId);
     await ctx.db.patch("workspaces", workspaceId, {
       ...(name !== undefined ? { name: cleanText(name, 40) || "Untitled" } : {}),
       ...(emoji !== undefined ? { emoji: cleanText(emoji, 8) || "🏺" } : {}),
-      ...(keyId !== undefined ? { keyId: keyId ?? undefined } : {}),
       updatedAt: Date.now(),
     });
     return null;

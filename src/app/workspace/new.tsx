@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import { SymbolView } from "expo-symbols";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "../../../convex/_generated/api";
@@ -50,12 +50,10 @@ function TemplateRow({ kindId, value, onChange, optional }: { kindId: string; va
 export default function NewWorkspace() {
   const insets = useSafeAreaInsets();
   const key = deviceKey();
-  const keys = useQuery(api.keys.list, { deviceKey: key });
   const projects = useQuery(api.projects.list);
   const create = useMutation(api.workspaces.create);
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState(EMOJI[0]);
-  const [keyId, setKeyId] = useState<Id<"apiKeys"> | null>(null);
   const [source, setSource] = useState<"prompt" | "template" | "connected">("prompt");
   const [prompt, setPrompt] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
@@ -65,13 +63,9 @@ export default function NewWorkspace() {
   const [icon, setIcon] = useState<string | null>("glyph");
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    if (keys?.length && keyId === null) setKeyId(keys[0]._id);
-  }, [keys?.length]);
-
   const ready =
     name.trim().length > 0 &&
-    (source === "prompt" ? prompt.trim().length >= 8 && keyId !== null : source === "template" ? appTemplate !== null : projectId !== null);
+    (source === "prompt" ? prompt.trim().length >= 8 : source === "template" ? appTemplate !== null : projectId !== null);
 
   const submit = async () => {
     if (!ready || busy) return;
@@ -82,7 +76,6 @@ export default function NewWorkspace() {
         deviceKey: key,
         name: name.trim(),
         emoji,
-        keyId: keyId ?? undefined,
         appProjectId: source === "connected" ? projectId! : undefined,
         appTemplateId: source === "template" ? appTemplate! : undefined,
         appPrompt: source === "prompt" ? prompt.trim() : undefined,
@@ -100,7 +93,7 @@ export default function NewWorkspace() {
 
   return (
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: colors.canvas }}>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 120, paddingHorizontal: 20 }}>
+      <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 120, paddingHorizontal: 20 }}>
         <Pressable testID="new-workspace-close" accessibilityLabel="Close" onPress={() => router.back()} style={styles.close}>
           <SymbolView name="xmark" size={14} tintColor={colors.ink} weight="bold" />
         </Pressable>
@@ -140,9 +133,11 @@ export default function NewWorkspace() {
                   placeholderTextColor={colors.muted}
                   multiline
                   maxLength={1200}
+                  returnKeyType="done"
+                  submitBehavior="blurAndSubmit"
                   style={styles.prompt}
                 />
-                <Text style={styles.hint}>Clay designs a multipage app from this with your model key. Then mark it up to change anything.</Text>
+                <Text style={styles.hint}>Clay designs a multipage app from this. Then mark it up to change anything.</Text>
               </View>
             ) : source === "template" ? (
               <TemplateRow kindId="app" value={appTemplate} onChange={setAppTemplate} />
@@ -175,35 +170,9 @@ export default function NewWorkspace() {
           <TemplateRow kindId="icon" value={icon} onChange={setIcon} optional />
         </Section>
 
-        <Section title="Model key" hint="Clay uses this key when you mark up a logo or icon in this workspace.">
-          {keys === undefined ? (
-            <ActivityIndicator color={colors.inkSoft} />
-          ) : (
-            <View style={{ gap: 8 }}>
-              {keys.map((item) => (
-                <Pressable key={item._id} testID={`pick-key-${item.provider}`} onPress={() => setKeyId(item._id)} style={[styles.row, keyId === item._id && styles.tileOn]}>
-                  <View style={styles.providerBadge}>
-                    <Text style={styles.providerLetter}>{item.provider === "openai" ? "O" : "A"}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.rowTitle}>{item.label}</Text>
-                    <Text style={styles.rowMeta}>•••• {item.last4} · {item.model}</Text>
-                  </View>
-                  {keyId === item._id && <SymbolView name="checkmark.circle.fill" size={20} tintColor={colors.accent} />}
-                </Pressable>
-              ))}
-              <Pressable testID="add-key" onPress={() => router.push("/settings")} style={styles.row}>
-                <SymbolView name="key" size={16} tintColor={colors.ink} />
-                <Text style={[styles.rowTitle, { flex: 1 }]}>{keys.length ? "Add another key" : "Add an OpenAI or Anthropic key"}</Text>
-                <SymbolView name="chevron.right" size={12} tintColor={colors.muted} weight="semibold" />
-              </Pressable>
-            </View>
-          )}
-        </Section>
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
         {problem && <Text style={styles.problem}>{problem}</Text>}
-        {source === "prompt" && keyId === null && <Text style={styles.problem}>Add a model key below so Clay can build the app.</Text>}
         <Pressable testID="create-workspace" onPress={submit} style={[styles.create, (!ready || busy) && { opacity: 0.4 }]}>
           {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.createText}>{source === "prompt" ? "Build it" : "Create workspace"}</Text>}
         </Pressable>
@@ -233,8 +202,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 18, backgroundColor: colors.surface, borderWidth: 2, borderColor: "transparent" },
   rowTitle: { fontFamily: fonts.semibold, fontSize: 15, color: colors.ink },
   rowMeta: { fontFamily: fonts.medium, fontSize: 12, color: colors.muted, marginTop: 2 },
-  providerBadge: { width: 34, height: 34, borderRadius: 11, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center" },
-  providerLetter: { fontFamily: fonts.bold, fontSize: 15, color: "#fff" },
   prompt: { minHeight: 120, backgroundColor: colors.surface, borderRadius: 18, padding: 14, paddingTop: 14, fontFamily: fonts.regular, fontSize: 16, lineHeight: 22, color: colors.ink, textAlignVertical: "top" },
   problem: { fontFamily: fonts.medium, fontSize: 13, color: colors.danger, marginBottom: 8, textAlign: "center" },
   footer: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 12, backgroundColor: colors.canvas },

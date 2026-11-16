@@ -7,8 +7,7 @@ import { commitOperations } from "./designs";
 import { cleanText } from "./lib";
 import { recall, remember } from "./memory";
 import { scheduleSuggestions } from "./suggestions";
-import { complete, parseJson } from "./models";
-import { decryptSecret } from "./secrets";
+import { MODEL, complete, parseJson } from "./models";
 import { ownedWorkspace, workspaceContext } from "./workspaces";
 import { kindRules, outline } from "../shared/context";
 import { kindOf } from "../shared/kinds";
@@ -31,7 +30,6 @@ export const iterate = mutation({
     const component = await ctx.db.get("components", args.componentId);
     if (!component?.designId) throw new Error("This part is edited by your coding agent, not here");
     const { workspace } = await ownedWorkspace(ctx, args.deviceKey, component.workspaceId);
-    if (!workspace.keyId) throw new Error("Pick an API key for this workspace first");
     const design = (await ctx.db.get("designs", component.designId))!;
     const note = cleanText(args.note, 1000);
     const marks = args.marks.slice(0, 30).map((mark) => ({
@@ -70,7 +68,6 @@ export const load = internalQuery({
     const component = (await ctx.db.get("components", run.componentId))!;
     const workspace = (await ctx.db.get("workspaces", run.workspaceId))!;
     const design = (await ctx.db.get("designs", component.designId!))!;
-    const key = workspace.keyId ? await ctx.db.get("apiKeys", workspace.keyId) : null;
     const base = await ctx.db
       .query("designVersions")
       .withIndex("by_designId_and_number", (q) => q.eq("designId", design._id).eq("number", run.baseNumber))
@@ -93,7 +90,6 @@ export const load = internalQuery({
       history: recent.reverse().map((row) => `v${row.number}: ${row.summary}`),
       context: await workspaceContext(ctx, workspace._id, component._id),
       imageUrl: run.imageId ? await ctx.storage.getUrl(run.imageId) : null,
-      key: key ? { provider: key.provider, model: key.model, ciphertext: key.ciphertext, iv: key.iv } : null,
     };
   },
 });
@@ -209,14 +205,9 @@ export const run = internalAction({
   args: { runId: v.id("agentRuns") },
   handler: async (ctx, { runId }): Promise<null> => {
     const data: LoadResult = await ctx.runQuery(internal.clay.load, { runId });
-    if (!data.key) {
-      await ctx.runMutation(internal.clay.setStatus, { runId, status: "failed", message: "This workspace has no API key" });
-      return null;
-    }
     const kind = kindOf(data.kind);
     const generating = data.run.mode === "generate";
-    await ctx.runMutation(internal.clay.setStatus, { runId, status: "thinking", message: generating ? "Designing your app" : "Looking at your marks", model: data.key.model });
-    const apiKey = await decryptSecret(data.key.ciphertext, data.key.iv);
+    await ctx.runMutation(internal.clay.setStatus, { runId, status: "thinking", message: generating ? "Designing your app" : "Looking at your marks", model: MODEL });
     const photoList = data.assets.length
       ? `Photos in this workspace (use these ids for image "src"):\n${data.assets.map((asset) => `- ${asset.id}: "${asset.name}"${asset.width && asset.height ? ` (${asset.width}x${asset.height})` : ""}`).join("\n")}`
       : "This workspace has no photos yet, so don't add image parts.";
@@ -231,7 +222,7 @@ export const run = internalAction({
       ].join("\n");
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-          const answer = await complete(data.key.provider, apiKey, data.key.model, GENERATE_SYSTEM, request, [], 16000);
+          const answer = await complete(GENERATE_SYSTEM, request, [], 16000);
           const parsed = parseJson(answer) as { name?: unknown; summary?: unknown; root?: unknown };
           await ctx.runMutation(internal.clay.setStatus, { runId, status: "thinking", message: "Laying out the pages" });
           const doc = validateDoc(parsed.root, kind);
@@ -249,7 +240,7 @@ export const run = internalAction({
           return null;
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          if (attempt === 2 || /key|401|quota|billing|rate/i.test(message)) {
+          if (attempt === 2 || /401|quota|billing|rate limit/i.test(message)) {
             await ctx.runMutation(internal.clay.setStatus, { runId, status: "failed", message: `Clay couldn't build that app: ${message}` });
             return null;
           }
@@ -282,7 +273,7 @@ export const run = internalAction({
     ].join("\n");
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const answer = await complete(data.key.provider, apiKey, data.key.model, SYSTEM, request, [...(data.imageUrl ? [data.imageUrl] : []), ...data.attached.map((asset) => asset.url)], 12000);
+        const answer = await complete(SYSTEM, request, [...(data.imageUrl ? [data.imageUrl] : []), ...data.attached.map((asset) => asset.url)], 12000);
         const parsed = parseJson(answer) as { summary?: unknown; operations?: unknown };
         if (!Array.isArray(parsed.operations)) throw new Error("The answer had no operations");
         await ctx.runMutation(internal.clay.setStatus, { runId, status: "thinking", message: "Shaping the new version" });
@@ -308,7 +299,7 @@ export const run = internalAction({
         throw new Error(result.message ?? "The change didn't fit the design");
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        if (attempt === 2 || /key|401|quota|billing|rate/i.test(message)) {
+        if (attempt === 2 || /401|quota|billing|rate limit/i.test(message)) {
           await ctx.runMutation(internal.clay.setStatus, { runId, status: "failed", message: `Clay couldn't make that change: ${message}` });
           return null;
         }
@@ -331,7 +322,6 @@ type LoadResult = {
   history: string[];
   context: string;
   imageUrl: string | null;
-  key: { provider: "openai" | "anthropic"; model: string; ciphertext: string; iv: string } | null;
 };
 
 export type RunId = Id<"agentRuns">;
