@@ -22,6 +22,7 @@ import { MakeSheet, Scope } from "../../components/MakeSheet";
 import { deviceKey } from "../../device";
 import { choosePhotoSource, usePhotoUpload } from "../../photos";
 import { colors, fonts, timeAgo } from "../../theme";
+import { uploadImage } from "../../uploads";
 
 type CommitScope = "one" | "many" | "everything" | "example";
 interface Offer { targets: string[]; operations: Operation[]; noun: string }
@@ -310,10 +311,7 @@ export function DesignEditor({ designId, componentId, base }: { designId: Id<"de
   const submitMarkup = async ({ note, marks, imageUri, assetIds }: { note: string; marks: Mark[]; imageUri: string; assetIds: string[] }) => {
     if (!componentId || !annotating) return;
     const uploadUrl = await generateUploadUrl();
-    const image = await (await fetch(imageUri)).blob();
-    const upload = await fetch(uploadUrl, { method: "POST", headers: { "Content-Type": "image/png" }, body: image });
-    if (!upload.ok) throw new Error("Upload failed. Check your connection.");
-    const { storageId } = (await upload.json()) as { storageId: Id<"_storage"> };
+    const storageId = await uploadImage(uploadUrl, imageUri, "image/png");
     await iterate({
       deviceKey: key,
       componentId,

@@ -16,6 +16,7 @@ import { Celebration } from "../../components/Celebration";
 import { LiveApp, LiveAppHandle, Viewport } from "../../components/LiveApp";
 import { Timeline } from "../../components/Timeline";
 import { colors, fonts } from "../../theme";
+import { uploadImage } from "../../uploads";
 
 export default function ProjectScreen() {
   const { id, base } = useLocalSearchParams<{ id: string; base?: string }>();
@@ -102,10 +103,7 @@ export default function ProjectScreen() {
 
   const submit = async ({ note, marks, imageUri }: { note: string; marks: Mark[]; imageUri: string }) => {
     const uploadUrl = await generateUploadUrl();
-    const image = await (await fetch(imageUri)).blob();
-    const upload = await fetch(uploadUrl, { method: "POST", headers: { "Content-Type": "image/png" }, body: image });
-    if (!upload.ok) throw new Error("Upload failed. Check your connection.");
-    const { storageId } = (await upload.json()) as { storageId: Id<"_storage"> };
+    const storageId = await uploadImage(uploadUrl, imageUri, "image/png");
     const viewport = annotating!.viewport;
     await createFeedback({
       projectId,
