@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import { SymbolView } from "expo-symbols";
+import { SymbolView } from "../../symbols";
 import { useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

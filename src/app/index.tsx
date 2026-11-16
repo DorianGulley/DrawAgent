@@ -1,7 +1,7 @@
 import { useQuery } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import { SymbolView } from "expo-symbols";
+import { SymbolView } from "../symbols";
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

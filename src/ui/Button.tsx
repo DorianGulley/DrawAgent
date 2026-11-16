@@ -1,4 +1,4 @@
-import { SymbolView, SymbolViewProps } from "expo-symbols";
+import { SymbolView, SymbolViewProps } from "../symbols";
 import { StyleProp, StyleSheet, Text, ViewStyle } from "react-native";
 import { colors, fonts, night, radius, shadow } from "../theme";
 import { Feel } from "./feel";

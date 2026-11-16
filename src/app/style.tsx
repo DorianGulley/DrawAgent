@@ -1,9 +1,10 @@
 import { useMutation, useQuery } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import { SymbolView } from "expo-symbols";
+import { SymbolView } from "../symbols";
 import { useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert } from "../platformUI";
 import Animated, { FadeIn, FadeInDown, LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "../../convex/_generated/api";

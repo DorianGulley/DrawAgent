@@ -21,7 +21,12 @@
       "package": "app.direct.editor"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "output": "single",
+      "name": "Clay",
+      "shortName": "Clay",
+      "themeColor": "#C65A35",
+      "backgroundColor": "#F3EEE6"
     },
     "plugins": [
       "expo-router",
@@ -54,6 +59,23 @@
     "scheme": "direct",
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "6230f06c-8647-4265-9260-3c01a4d036fd"
+      }
+    },
+    "owner": "dorian_gulley",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/6230f06c-8647-4265-9260-3c01a4d036fd"
+    },
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ]
   }
 }

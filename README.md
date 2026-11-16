@@ -1,5 +1,36 @@
 # Direct
 
+## Clay PWA
+
+Clay also runs as a mobile-first browser app, hosted with public access through
+Sites. It supports workspaces, app generation, touch markup, photo attachments,
+quick edits, version history, and public app sharing without Expo Go.
+
+- On iPhone, open the site in Safari, tap Share, then Add to Home Screen.
+- On Android, use Chrome's Install app option or Clay's Install button.
+- Each browser keeps its own device identity and workspaces in local storage.
+  Clearing site data resets that browser's access; native workspaces do not
+  automatically transfer to a browser.
+- The installed shell can open offline. Loading workspaces, uploads, and AI
+  edits require a connection. Backend responses and photos are never cached by
+  the service worker.
+- Apps built inside Clay support browser drawing. Cross-origin connected
+  websites can be previewed only when they allow embedding; browser security
+  prevents capturing and inspecting those external sites. Use the native app
+  for that workflow.
+
+```sh
+npm start                    # Expo Go with a tunnel for public Wi-Fi
+npm run web                  # browser development, also through a tunnel
+npm run build:web            # export the app and generate its offline shell
+npm run test:pwa             # check offline fallback and cache boundaries
+npm run preview:web          # test the export at http://localhost:8090
+```
+
+Site identity and static hosting configuration live in `.openai/hosting.json`.
+The public Convex URLs are embedded at build time; model API keys remain on
+the backend. A hosted PWA does not need your laptop or Metro running.
+
 Direct is a feedback and review layer for apps you build with coding agents. Open your app's live web preview on your phone, draw on it to show what should change, and Direct hands that to the project's agent (Claude Code, Codex, or any MCP-capable agent). The agent edits the code, commits, and publishes a version; your phone reloads the app and adds it to the timeline.
 
 Direct captures intent and shows results. It never edits code itself.
@@ -113,3 +144,22 @@ xcodebuild -workspace ios/Direct.xcworkspace -scheme Direct -configuration Relea
 ```
 
 `.env` points the app at the shared dev deployment (`EXPO_PUBLIC_CONVEX_URL`); the CLI uses the same deployment by default (override with `DIRECT_CONVEX_URL` or `--convex`).
+
+### Published Expo Go preview
+
+Clay's Expo project is `@dorian_gulley/direct`. The `hackathon` update branch
+hosts the native preview independently of the development server and your Mac.
+It requires Expo Go compatible with SDK 58 and permission to view the owning
+Expo account. Publishing does not grant everyone access to the preview. Use
+the public PWA for judges without Expo account access. The SDK runtime policy
+in `app.json` targets Expo Go rather than a custom Clay binary.
+
+To publish a new preview after changes:
+
+```sh
+npx eas-cli@latest update --branch hackathon --environment preview --platform all --message "Describe the changes"
+```
+
+The Expo `preview` environment holds the public Convex URLs. Server API keys
+stay in Convex. Use the published update group's Expo Go QR/link, rather than
+the local development tunnel or the account-protected dashboard page.

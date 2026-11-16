@@ -1,7 +1,8 @@
 import { useMutation, useQuery } from "convex/react";
-import { SymbolView } from "expo-symbols";
+import { SymbolView } from "../symbols";
 import { useState } from "react";
-import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert } from "../platformUI";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { colors, fonts, timeAgo } from "../theme";

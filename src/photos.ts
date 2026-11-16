@@ -1,7 +1,8 @@
 import { useAction, useMutation } from "convex/react";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
-import { ActionSheetIOS } from "react-native";
+import { Platform } from "react-native";
+import { ActionSheetIOS } from "./platformUI";
 import { api } from "../convex/_generated/api";
 import { Id } from "../convex/_generated/dataModel";
 import { deviceKey } from "./device";
@@ -13,6 +14,7 @@ const MAX_SIDE = 2048;
 export type PhotoSource = "library" | "camera";
 
 export function choosePhotoSource(): Promise<PhotoSource | null> {
+  if (Platform.OS === "web") return Promise.resolve("library");
   return new Promise((resolve) =>
     ActionSheetIOS.showActionSheetWithOptions({ title: "Add a photo", options: ["Choose from library", "Take a photo", "Cancel"], cancelButtonIndex: 2 }, (choice) =>
       resolve(choice === 0 ? "library" : choice === 1 ? "camera" : null),

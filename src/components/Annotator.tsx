@@ -1,11 +1,11 @@
 import * as Haptics from "expo-haptics";
-import { SymbolView, SymbolViewProps } from "expo-symbols";
+import { SymbolView, SymbolViewProps } from "../symbols";
 import { ComponentRef, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Image, KeyboardAvoidingView, PanResponder, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import Animated, { FadeInDown, FadeOutDown, ZoomIn, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Ellipse, G, Line, Path, Polygon, Rect, Text as SvgText } from "react-native-svg";
-import { captureRef } from "react-native-view-shot";
+import { captureRef } from "../capture";
 import { colors, fonts } from "../theme";
 import { ElementInfo, Point, Probe } from "./LiveApp";
 

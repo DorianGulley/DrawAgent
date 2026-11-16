@@ -2,7 +2,7 @@ import { useQuery } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { ComponentType, Ref, RefObject, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { StyleProp, ViewStyle } from "react-native";
-import { WebView, WebViewMessageEvent } from "react-native-webview";
+import { WebView, WebViewMessageEvent } from "./WebView";
 import type { IOSWebViewProps } from "react-native-webview/lib/WebViewTypes";
 import { KindSpec } from "../../shared/kinds";
 import { api } from "../../convex/_generated/api";

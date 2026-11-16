@@ -1,6 +1,6 @@
 import { ComponentType, Ref, forwardRef, useImperativeHandle, useRef } from "react";
 import { StyleProp, ViewStyle } from "react-native";
-import { WebView, WebViewMessageEvent } from "react-native-webview";
+import { WebView, WebViewMessageEvent } from "./WebView";
 import type { IOSWebViewProps } from "react-native-webview/lib/WebViewTypes";
 
 const IOSWebView = WebView as unknown as ComponentType<IOSWebViewProps & { ref?: Ref<WebView> }>;
