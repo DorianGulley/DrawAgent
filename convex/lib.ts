@@ -25,3 +25,8 @@ export function cleanUrl(value: string): string {
   if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("URL must be http(s)");
   return url.toString();
 }
+
+export async function ownerHashFor(deviceKey: string): Promise<string> {
+  if (!/^dev_[a-f0-9]{48}$/.test(deviceKey)) throw new Error("Invalid device key");
+  return await sha256(deviceKey);
+}

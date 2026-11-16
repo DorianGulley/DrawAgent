@@ -34,9 +34,12 @@ export const create = mutation({
     imageId: v.id("_storage"),
     viewport: v.object({ width: v.number(), height: v.number(), scrollY: v.number() }),
     pageUrl: v.string(),
+    baseVersionId: v.optional(v.id("versions")),
   },
   handler: async (ctx, args) => {
     const project = await ctx.db.get("projects", args.projectId);
+    const base = args.baseVersionId ? await ctx.db.get("versions", args.baseVersionId) : null;
+    if (args.baseVersionId && base?.projectId !== args.projectId) throw new Error("Version not found");
     if (!project) throw new Error("Project not found");
     const note = cleanText(args.note, 1000);
     if (args.marks.length > MAX_MARKS) throw new Error("Too many marks");
@@ -58,11 +61,11 @@ export const create = mutation({
       note,
       marks,
       pageUrl: cleanText(args.pageUrl, 500),
-      baseVersionId: project.latestVersionId,
+      baseVersionId: base?._id ?? project.latestVersionId,
       status: "pending",
       updatedAt: now,
     });
-    await ctx.db.insert("feedbackEvents", { feedbackId, status: "pending", message: "Sent to your agent", at: now });
+    await ctx.db.insert("feedbackEvents", { feedbackId, status: "pending", message: base && base._id !== project.latestVersionId ? `Sent to your agent (marked on v${base.number})` : "Sent to your agent", at: now });
     await ctx.db.patch("projects", project._id, { updatedAt: now });
     return feedbackId;
   },

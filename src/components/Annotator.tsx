@@ -1,7 +1,7 @@
 import * as Haptics from "expo-haptics";
 import { SymbolView, SymbolViewProps } from "expo-symbols";
 import { ComponentRef, useEffect, useMemo, useRef, useState } from "react";
-import { Image, KeyboardAvoidingView, PanResponder, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, KeyboardAvoidingView, PanResponder, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import Animated, { FadeInDown, FadeOutDown, ZoomIn, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Ellipse, G, Line, Path, Polygon, Rect, Text as SvgText } from "react-native-svg";
@@ -33,7 +33,11 @@ interface Props {
   frameUri: string;
   hitTest: (probes: Probe[]) => Promise<ElementInfo[][]>;
   onCancel: () => void;
-  onSubmit: (input: { note: string; marks: Mark[]; imageUri: string }) => Promise<void>;
+  onSubmit: (input: { note: string; marks: Mark[]; imageUri: string; assetIds: string[] }) => Promise<void>;
+  onAttachPhoto?: () => Promise<{ id: string; uri: string } | null>;
+  agentName?: string;
+  heading?: string;
+  subject?: string;
 }
 
 function probeFor(kind: Tool, points: Point[]): Probe {
@@ -117,7 +121,9 @@ function Flash() {
   return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: "#fff" }, style]} />;
 }
 
-export function Annotator({ frameUri, hitTest, onCancel, onSubmit }: Props) {
+export function Annotator({ frameUri, hitTest, onCancel, onSubmit, onAttachPhoto, agentName = "your agent", heading, subject = "your app" }: Props) {
+  const [photos, setPhotos] = useState<{ id: string; uri: string }[]>([]);
+  const [attaching, setAttaching] = useState(false);
   const insets = useSafeAreaInsets();
   const canvas = useRef<ComponentRef<typeof View>>(null);
   const [marks, setMarks] = useState<Mark[]>([]);
@@ -182,12 +188,12 @@ export function Annotator({ frameUri, hitTest, onCancel, onSubmit }: Props) {
   };
 
   const send = async () => {
-    if (!note.trim() && marks.length === 0) return;
+    if (!note.trim() && marks.length === 0 && photos.length === 0) return;
     setStep("sending");
     setError(null);
     try {
       const imageUri = await captureRef(canvas, { format: "png", quality: 1, result: "tmpfile" });
-      await onSubmit({ note: note.trim(), marks, imageUri });
+      await onSubmit({ note: note.trim(), marks, imageUri, assetIds: photos.map((photo) => photo.id) });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't send. Try again.");
       setStep("note");
@@ -217,7 +223,7 @@ export function Annotator({ frameUri, hitTest, onCancel, onSubmit }: Props) {
         </Pressable>
         <View style={styles.hint}>
           <View style={[styles.hintDot, { backgroundColor: TAG_COLORS[tag] }]} />
-          <Text style={styles.hintText}>{marks.length === 0 ? "Draw on your app" : `${marks.length} mark${marks.length === 1 ? "" : "s"}`}</Text>
+          <Text style={styles.hintText}>{marks.length === 0 ? `Draw on ${subject}` : `${marks.length} mark${marks.length === 1 ? "" : "s"}`}</Text>
         </View>
         <Pressable
           testID="annotate-undo"
@@ -304,7 +310,7 @@ export function Annotator({ frameUri, hitTest, onCancel, onSubmit }: Props) {
             <View style={styles.grabber} />
             <Text style={styles.sheetTitle}>What should change?</Text>
             <Text style={styles.sheetSub}>
-              Your agent gets the screenshot, your {marks.length} mark{marks.length === 1 ? "" : "s"}, and the elements under them.
+              {heading ? `${heading}. ` : ""}{agentName.charAt(0).toUpperCase() + agentName.slice(1)} gets the screenshot, your {marks.length} mark{marks.length === 1 ? "" : "s"}, and the parts under them.
             </Text>
             <TextInput
               testID="feedback-note"
@@ -318,14 +324,45 @@ export function Annotator({ frameUri, hitTest, onCancel, onSubmit }: Props) {
               maxLength={1000}
               editable={step === "note"}
             />
+            {onAttachPhoto && (
+              <View style={styles.photoRow}>
+                {photos.map((photo) => (
+                  <Pressable key={photo.id} onLongPress={() => setPhotos((all) => all.filter((item) => item.id !== photo.id))}>
+                    <Image source={{ uri: photo.uri }} style={styles.photoThumb} />
+                  </Pressable>
+                ))}
+                {photos.length < 4 && (
+                  <Pressable
+                    testID="attach-photo"
+                    disabled={attaching || step === "sending"}
+                    onPress={async () => {
+                      setAttaching(true);
+                      setError(null);
+                      try {
+                        const photo = await onAttachPhoto();
+                        if (photo) setPhotos((all) => [...all, photo]);
+                      } catch (problem) {
+                        setError(problem instanceof Error ? problem.message.replace(/^.*Uncaught Error: /s, "").split("\n")[0] : "Couldn't add that photo");
+                      } finally {
+                        setAttaching(false);
+                      }
+                    }}
+                    style={styles.attach}
+                  >
+                    {attaching ? <ActivityIndicator size="small" color={colors.ink} /> : <SymbolView name="photo.badge.plus" size={18} tintColor={colors.ink} />}
+                    <Text style={styles.attachText}>{photos.length ? "Another" : "Add a photo"}</Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
             {error && <Text style={styles.error}>{error}</Text>}
             <View style={styles.sheetActions}>
               <Pressable onPress={() => setStep("draw")} disabled={step === "sending"} style={styles.backButton}>
                 <Text style={styles.backText}>Keep drawing</Text>
               </Pressable>
-              <Pressable testID="feedback-send" accessibilityLabel="Send to agent" onPress={send} disabled={step === "sending"} style={styles.sendButton}>
+              <Pressable testID="feedback-send" accessibilityLabel={`Send to ${agentName}`} onPress={send} disabled={step === "sending"} style={styles.sendButton}>
                 <SymbolView name="paperplane.fill" size={15} tintColor="#fff" />
-                <Text style={styles.sendText}>{step === "sending" ? "Sending…" : "Send to agent"}</Text>
+                <Text style={styles.sendText}>{step === "sending" ? "Sending…" : `Send to ${agentName}`}</Text>
               </Pressable>
             </View>
           </Animated.View>
@@ -336,6 +373,10 @@ export function Annotator({ frameUri, hitTest, onCancel, onSubmit }: Props) {
 }
 
 const styles = StyleSheet.create({
+  photoRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
+  photoThumb: { width: 52, height: 52, borderRadius: 12, backgroundColor: colors.canvas },
+  attach: { flexDirection: "row", alignItems: "center", gap: 7, height: 52, paddingHorizontal: 14, borderRadius: 14, backgroundColor: colors.canvas },
+  attachText: { fontFamily: fonts.semibold, fontSize: 14, color: colors.ink },
   frame: { ...StyleSheet.absoluteFill, borderWidth: 3, borderColor: "rgba(124,92,255,0.55)" },
   topRow: { position: "absolute", left: 14, right: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   roundButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.94)", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },

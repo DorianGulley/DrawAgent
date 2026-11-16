@@ -73,6 +73,22 @@ direct setup codex    # prints: codex mcp add direct -- node … (and the ~/.cod
 
 Then ask the agent "check Direct for feedback". It can list, claim, and publish the same way.
 
+## Make mode (on the phone)
+
+Next to connected apps, Direct can make three kinds of things itself: **apps**, **lock screens**, and **logos**. Each starts from a template in a gallery (never a blank canvas) and is edited by tapping parts of it.
+
+- **Kinds** live in one registry, `shared/kinds.ts`: canvas size and layout, phone/lock-screen/artboard chrome, which changes are allowed, templates, and export. A new kind is a registry entry plus templates in `shared/templates.ts`; the renderer, bridge, interpreter, and Convex pipeline are shared.
+- **Selecting:** tap a thing to open the sheet. While the sheet is open, taps add or remove things. Press and hold to pick every sibling of the same type. The scope control switches between *Just this*, *All like it*, and *Everything*. The sheet shows the values the selection shares and says "Mixed" where they differ.
+- **Changes** are operations with `targets: string[]` (`shared/operations.ts`). One action, however many things it touches, is one entry in history and one tap of undo. After changing one thing that has siblings, Direct offers "Apply to the other N?", which is recorded as its own step.
+- **Everything** scope ("make the whole thing feel warmer", "tighten all the spacing", "match my style") produces a preview with *Keep it* / *Discard*. Nothing is saved until you keep it, and keeping is one step in history.
+- **Your style** (`shared/style.ts`): every kept change to specific things is tallied per device (undo removes it again; whole-design tone shifts like "warmer" are not tallied) (corners, padding, spacing, heading weight, accent color, card color). The profile is the median (numbers) or most frequent value (colors, weight), with choices you set yourself taking priority. It feeds the sheet's swatches, the "Use my style" button, defaults for vague instructions ("rounder" goes to your usual radius), and new designs, which start in your style. Instructions with explicit values always win. The *Your style* screen lists each preference in plain words; each can be changed or forgotten, and there is a reset.
+- **Export:** lock screens save to Photos at screen resolution; logos save as PNGs with a clear background.
+- **Storage:** Convex tables `designs`, `designVersions`, and `styleMemory`. The device keeps a random key in the iOS keychain (expo-secure-store); Convex stores only its hash. There are no accounts.
+
+### The interpreter is deterministic
+
+`shared/interpreter.ts` does not call a language model. It is a rule-based parser over the design's full structure and recent history. It understands text changes, colors (named or hex, light/dark), size, weight, alignment, spacing, corners, moving things ("move this above the progress bar"), references to things that aren't selected ("match the header", "use the same green as the buttons"), "do the same" (replays the last change on the new selection), and the whole-design phrases above. Anything else gets a plain message suggesting what to try. The server re-validates every operation (`applyOperations`) before saving, so the client cannot store arbitrary content.
+
 ## Security model
 
 - The phone never sees project keys. Keys are generated once by `direct init`, kept in `.direct.json` on the laptop, and stored server-side only as a hash.

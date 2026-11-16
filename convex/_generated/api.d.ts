@@ -9,9 +9,17 @@
  */
 
 import type * as agent from "../agent.js";
+import type * as assets from "../assets.js";
+import type * as clay from "../clay.js";
+import type * as designs from "../designs.js";
 import type * as feedback from "../feedback.js";
 import type * as lib from "../lib.js";
+import type * as memory from "../memory.js";
+import type * as models from "../models.js";
 import type * as projects from "../projects.js";
+import type * as style from "../style.js";
+import type * as suggestions from "../suggestions.js";
+import type * as workspaces from "../workspaces.js";
 
 import type {
   ApiFromModules,
@@ -21,9 +29,17 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   agent: typeof agent;
+  assets: typeof assets;
+  clay: typeof clay;
+  designs: typeof designs;
   feedback: typeof feedback;
   lib: typeof lib;
+  memory: typeof memory;
+  models: typeof models;
   projects: typeof projects;
+  style: typeof style;
+  suggestions: typeof suggestions;
+  workspaces: typeof workspaces;
 }>;
 
 /**
