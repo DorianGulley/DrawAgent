@@ -147,10 +147,22 @@ export default defineSchema({
     versionNumber: v.optional(v.number()),
     model: v.optional(v.string()),
     suggestionId: v.optional(v.id("suggestions")),
+    assetIds: v.optional(v.array(v.id("assets"))),
+    mode: v.optional(v.literal("generate")),
     updatedAt: v.number(),
   })
     .index("by_componentId", ["componentId"])
     .index("by_workspaceId", ["workspaceId"]),
+  assets: defineTable({
+    workspaceId: v.id("workspaces"),
+    storageId: v.id("_storage"),
+    name: v.string(),
+    contentType: v.string(),
+    size: v.number(),
+    width: v.optional(v.number()),
+    height: v.optional(v.number()),
+    createdAt: v.number(),
+  }).index("by_workspaceId", ["workspaceId"]),
   suggestions: defineTable({
     workspaceId: v.id("workspaces"),
     componentId: v.id("components"),

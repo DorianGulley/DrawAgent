@@ -3,9 +3,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
-import { ComponentRef, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Image, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
-import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
+import { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import Animated, { Extrapolation, interpolate, useAnimatedRef, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
@@ -41,11 +42,11 @@ export default function HistoryScrubber() {
 
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const ruler = useRef<ComponentRef<typeof ScrollView>>(null);
+  const ruler = useAnimatedRef<Animated.ScrollView>();
   const [index, setIndex] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
-  const pop = useSharedValue(1);
-  const tilt = useSharedValue(0);
+  const offset = useSharedValue(0);
+  const lastIndex = useSharedValue(-1);
 
   const kind: KindSpec | null = part?.design ? kindOf(part.design.kind) : null;
   const frames: Frame[] | null = useMemo(() => {
@@ -74,6 +75,11 @@ export default function HistoryScrubber() {
   const frame = frames?.[active];
 
   useEffect(() => {
+    if (!frames) return;
+    for (const item of frames) if (item.imageUrl) Image.prefetch(item.imageUrl);
+  }, [frames?.length]);
+
+  useEffect(() => {
     if (!frames || index !== null) return;
     const start = current >= 0 ? current : frames.length - 1;
     setTimeout(() => ruler.current?.scrollTo({ x: start * STEP, animated: false }), 50);
@@ -89,19 +95,32 @@ export default function HistoryScrubber() {
     return () => clearTimeout(timer);
   }, [playing, active]);
 
-  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (!frames) return;
-    const next = Math.max(0, Math.min(frames.length - 1, Math.round(event.nativeEvent.contentOffset.x / STEP)));
-    if (next === active) return;
-    tilt.value = withSequence(withTiming(next > active ? -1 : 1, { duration: 90 }), withSpring(0, { damping: 12 }));
-    pop.value = withSequence(withTiming(0.965, { duration: 80 }), withSpring(1, { damping: 10, stiffness: 220 }));
+  const settle = (next: number) => {
     Haptics.selectionAsync();
     setIndex(next);
   };
+  const count = frames?.length ?? 1;
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      offset.value = event.contentOffset.x;
+      const next = Math.max(0, Math.min(count - 1, Math.round(event.contentOffset.x / STEP)));
+      if (next !== lastIndex.value) {
+        lastIndex.value = next;
+        scheduleOnRN(settle, next);
+      }
+    },
+  });
 
-  const stageStyle = useAnimatedStyle(() => ({
-    transform: [{ perspective: 900 }, { scale: pop.value }, { rotateY: `${tilt.value * 6}deg` }],
-  }));
+  const stageStyle = useAnimatedStyle(() => {
+    const drift = offset.value / STEP - Math.round(offset.value / STEP);
+    return {
+      transform: [
+        { perspective: 900 },
+        { scale: interpolate(Math.abs(drift), [0, 0.5], [1, 0.97], Extrapolation.CLAMP) },
+        { rotateY: `${interpolate(drift, [-0.5, 0.5], [7, -7], Extrapolation.CLAMP)}deg` },
+      ],
+    };
+  });
 
   const name = part?.name ?? project?.name ?? "History";
   if (!frames || !frame) {
@@ -172,7 +191,7 @@ export default function HistoryScrubber() {
                 { width: stageWidth, height: stageHeight, opacity: offset === 1 ? 0.45 : 0.2, transform: [{ translateY: -18 * offset }, { scale: 1 - 0.06 * offset }] },
               ]}
             >
-              {back.doc && kind ? <DesignThumb doc={back.doc} kind={kind} width={stageWidth} height={stageHeight} /> : back.imageUrl ? <Image source={{ uri: back.imageUrl }} style={styles.image} /> : null}
+              {back.imageUrl ? <Image source={{ uri: back.imageUrl }} style={styles.image} fadeDuration={0} /> : null}
             </View>
           );
         })}
@@ -180,7 +199,7 @@ export default function HistoryScrubber() {
           {frame.doc && kind ? (
             <DesignThumb doc={frame.doc} kind={kind} width={stageWidth} height={stageHeight} />
           ) : frame.imageUrl ? (
-            <Animated.Image key={frame.number} entering={FadeIn.duration(180)} source={{ uri: frame.imageUrl }} style={styles.image} resizeMode="cover" />
+            <Image source={{ uri: frame.imageUrl }} style={styles.image} resizeMode="cover" fadeDuration={0} />
           ) : (
             <View style={[styles.image, styles.center, { backgroundColor: "#2A2431" }]}>
               <Text style={styles.bigNumber}>v{frame.number}</Text>
@@ -198,15 +217,15 @@ export default function HistoryScrubber() {
         </Animated.View>
       </View>
 
-      <Animated.View key={frame.number} entering={FadeIn.duration(160)} style={styles.caption}>
+      <View style={styles.caption}>
         <Text style={styles.captionMeta}>
           {frame.by === "agent" ? (part?.design ? "Made by Clay" : "Made by your agent") : frame.by === "start" ? "Where it started" : "Your change"} · {timeAgo(frame.createdAt)}
         </Text>
         <Text testID="scrub-summary" numberOfLines={2} style={styles.captionText}>{frame.summary}</Text>
-      </Animated.View>
+      </View>
 
       <View style={styles.rulerWrap}>
-        <ScrollView
+        <Animated.ScrollView
           ref={ruler}
           testID="scrub-ruler"
           horizontal
@@ -228,7 +247,7 @@ export default function HistoryScrubber() {
               </Pressable>
             );
           })}
-        </ScrollView>
+        </Animated.ScrollView>
         <View pointerEvents="none" style={[styles.needle, { left: width / 2 - 1 }]} />
       </View>
 

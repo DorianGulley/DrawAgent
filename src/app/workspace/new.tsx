@@ -56,7 +56,9 @@ export default function NewWorkspace() {
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState(EMOJI[0]);
   const [keyId, setKeyId] = useState<Id<"apiKeys"> | null>(null);
-  const [source, setSource] = useState<"template" | "connected">("template");
+  const [source, setSource] = useState<"prompt" | "template" | "connected">("prompt");
+  const [prompt, setPrompt] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
   const [appTemplate, setAppTemplate] = useState<string | null>("habits");
   const [projectId, setProjectId] = useState<Id<"projects"> | null>(null);
   const [logo, setLogo] = useState<string | null>("sprout");
@@ -67,11 +69,14 @@ export default function NewWorkspace() {
     if (keys?.length && keyId === null) setKeyId(keys[0]._id);
   }, [keys?.length]);
 
-  const ready = name.trim().length > 0 && (source === "template" ? appTemplate !== null : projectId !== null);
+  const ready =
+    name.trim().length > 0 &&
+    (source === "prompt" ? prompt.trim().length >= 8 && keyId !== null : source === "template" ? appTemplate !== null : projectId !== null);
 
   const submit = async () => {
     if (!ready || busy) return;
     setBusy(true);
+    setProblem(null);
     try {
       const workspaceId = await create({
         deviceKey: key,
@@ -80,11 +85,14 @@ export default function NewWorkspace() {
         keyId: keyId ?? undefined,
         appProjectId: source === "connected" ? projectId! : undefined,
         appTemplateId: source === "template" ? appTemplate! : undefined,
+        appPrompt: source === "prompt" ? prompt.trim() : undefined,
         logoTemplateId: logo ?? undefined,
         iconTemplateId: icon ?? undefined,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace({ pathname: "/workspace/[id]", params: { id: workspaceId } });
+    } catch (error) {
+      setProblem(error instanceof Error ? error.message.replace(/^.*Uncaught Error: /s, "").split("\n")[0] : "Couldn't create the workspace");
     } finally {
       setBusy(false);
     }
@@ -103,7 +111,7 @@ export default function NewWorkspace() {
           <View style={styles.emojiWell}>
             <Text style={{ fontSize: 26 }}>{emoji}</Text>
           </View>
-          <TextInput testID="workspace-name" value={name} onChangeText={setName} placeholder="Name it" placeholderTextColor={colors.muted} style={styles.nameInput} autoFocus maxLength={40} />
+          <TextInput testID="workspace-name" value={name} onChangeText={setName} placeholder="Name it" placeholderTextColor={colors.muted} style={styles.nameInput} autoFocus maxLength={40} returnKeyType="done" />
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ marginTop: 12 }}>
           {EMOJI.map((item) => (
@@ -115,14 +123,28 @@ export default function NewWorkspace() {
 
         <Section title="The app">
           <View style={styles.segment}>
-            {(["template", "connected"] as const).map((item) => (
+            {(["prompt", "template", "connected"] as const).map((item) => (
               <Pressable key={item} testID={`source-${item}`} onPress={() => setSource(item)} style={[styles.segmentItem, source === item && styles.segmentOn]}>
-                <Text style={[styles.segmentText, source === item && styles.segmentTextOn]}>{item === "template" ? "Start from a design" : "A connected app"}</Text>
+                <Text style={[styles.segmentText, source === item && styles.segmentTextOn]}>{item === "prompt" ? "Describe it" : item === "template" ? "A template" : "Connected"}</Text>
               </Pressable>
             ))}
           </View>
           <View style={{ marginTop: 12 }}>
-            {source === "template" ? (
+            {source === "prompt" ? (
+              <View>
+                <TextInput
+                  testID="app-prompt"
+                  value={prompt}
+                  onChangeText={setPrompt}
+                  placeholder="A habit tracker for runners with weekly goals, a training plan, and a page to compare streaks with friends"
+                  placeholderTextColor={colors.muted}
+                  multiline
+                  maxLength={1200}
+                  style={styles.prompt}
+                />
+                <Text style={styles.hint}>Clay designs a multipage app from this with your model key. Then mark it up to change anything.</Text>
+              </View>
+            ) : source === "template" ? (
               <TemplateRow kindId="app" value={appTemplate} onChange={setAppTemplate} />
             ) : projects === undefined ? (
               <ActivityIndicator color={colors.inkSoft} />
@@ -180,8 +202,10 @@ export default function NewWorkspace() {
         </Section>
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
+        {problem && <Text style={styles.problem}>{problem}</Text>}
+        {source === "prompt" && keyId === null && <Text style={styles.problem}>Add a model key below so Clay can build the app.</Text>}
         <Pressable testID="create-workspace" onPress={submit} style={[styles.create, (!ready || busy) && { opacity: 0.4 }]}>
-          {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.createText}>Create workspace</Text>}
+          {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.createText}>{source === "prompt" ? "Build it" : "Create workspace"}</Text>}
         </Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -211,6 +235,8 @@ const styles = StyleSheet.create({
   rowMeta: { fontFamily: fonts.medium, fontSize: 12, color: colors.muted, marginTop: 2 },
   providerBadge: { width: 34, height: 34, borderRadius: 11, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center" },
   providerLetter: { fontFamily: fonts.bold, fontSize: 15, color: "#fff" },
+  prompt: { minHeight: 120, backgroundColor: colors.surface, borderRadius: 18, padding: 14, paddingTop: 14, fontFamily: fonts.regular, fontSize: 16, lineHeight: 22, color: colors.ink, textAlignVertical: "top" },
+  problem: { fontFamily: fonts.medium, fontSize: 13, color: colors.danger, marginBottom: 8, textAlign: "center" },
   footer: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 12, backgroundColor: colors.canvas },
   create: { height: 54, borderRadius: 27, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center" },
   createText: { fontFamily: fonts.semibold, fontSize: 16, color: "#fff" },

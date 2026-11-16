@@ -15,6 +15,10 @@ export const NODE_TYPES = [
   "row",
   "shape",
   "clock",
+  "page",
+  "image",
+  "input",
+  "divider",
 ] as const;
 
 export type NodeType = (typeof NODE_TYPES)[number];
@@ -49,6 +53,8 @@ export interface AppNode {
   icon?: string;
   done?: boolean;
   action?: NodeAction;
+  target?: string;
+  src?: string;
   style: StyleMap;
   children?: AppNode[];
 }
@@ -77,6 +83,10 @@ export const TYPE_LABELS: Record<NodeType, string> = {
   row: "Row",
   shape: "Shape",
   clock: "Clock",
+  page: "Page",
+  image: "Photo",
+  input: "Input",
+  divider: "Divider",
 };
 
 export const PLURAL_LABELS: Record<NodeType, string> = {
@@ -96,13 +106,21 @@ export const PLURAL_LABELS: Record<NodeType, string> = {
   row: "rows",
   shape: "shapes",
   clock: "clocks",
+  page: "pages",
+  image: "photos",
+  input: "inputs",
+  divider: "dividers",
 };
 
-export const CONTAINER_TYPES: NodeType[] = ["screen", "header", "card", "section", "statGroup", "grid", "row", "shape"];
+export const CONTAINER_TYPES: NodeType[] = ["screen", "header", "card", "section", "statGroup", "grid", "row", "shape", "page"];
 
-export const TEXT_TYPES: NodeType[] = ["heading", "text", "button", "habit", "stat", "badge", "clock"];
+export const TEXT_TYPES: NodeType[] = ["heading", "text", "button", "habit", "stat", "badge", "clock", "page", "input"];
 
-export const BOXED_TYPES: NodeType[] = ["card", "button", "habit", "stat", "badge", "progress", "shape"];
+export const BOXED_TYPES: NodeType[] = ["card", "button", "habit", "stat", "badge", "progress", "shape", "image", "input"];
+
+export const LINKABLE_TYPES: NodeType[] = ["button", "card", "habit", "row", "image"];
+
+export const SIZED_TYPES: NodeType[] = ["progress", "shape", "image", "divider"];
 
 export const DEFAULT_STYLE: Record<NodeType, StyleMap> = {
   screen: { backgroundColor: "#FBF8F3", color: "#1B1A17", padding: 20, gap: 18 },
@@ -144,7 +162,23 @@ export const DEFAULT_STYLE: Record<NodeType, StyleMap> = {
   row: { gap: 14, padding: 0 },
   shape: { backgroundColor: "#635BFF", color: "#FFFFFF", width: 120, height: 120, borderRadius: 32, padding: 0 },
   clock: { fontSize: 88, fontWeight: 600, textAlign: "center" },
+  page: { padding: 0, gap: 18 },
+  image: { height: 180, borderRadius: 18, backgroundColor: "#E9E4DA" },
+  input: { backgroundColor: "#FFFFFF", color: "#1B1A17", fontSize: 15, padding: 14, borderRadius: 14 },
+  divider: { backgroundColor: "#E6E0D6", height: 1 },
 };
+
+export function pagesOf(root: AppNode): AppNode[] {
+  return (root.children ?? []).filter((child) => child.type === "page");
+}
+
+export function imageSources(root: AppNode): string[] {
+  const sources = new Set<string>();
+  walkNodes(root, (node) => {
+    if (node.type === "image" && node.src) sources.add(node.src);
+  });
+  return [...sources];
+}
 
 export function effectiveStyle(node: AppNode): StyleMap {
   return { ...DEFAULT_STYLE[node.type], ...node.style };

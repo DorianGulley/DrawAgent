@@ -33,11 +33,12 @@ export async function complete(
   model: string,
   system: string,
   user: string,
-  imageUrl: string | null,
+  images: string[],
+  maxTokens = 8000,
 ): Promise<string> {
   if (provider === "openai") {
     const content: unknown[] = [{ type: "input_text", text: user }];
-    if (imageUrl) content.push({ type: "input_image", image_url: imageUrl });
+    for (const url of images) content.push({ type: "input_image", image_url: url });
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -46,6 +47,7 @@ export async function complete(
         instructions: system,
         input: [{ role: "user", content }],
         text: { format: { type: "json_object" } },
+        max_output_tokens: maxTokens * 4,
       }),
     });
     const body = (await response.json()) as { error?: { message: string }; output?: { type: string; content?: { type: string; text?: string }[] }[] };
@@ -60,12 +62,12 @@ export async function complete(
     return text;
   }
   const content: unknown[] = [];
-  if (imageUrl) content.push({ type: "image", source: { type: "url", url: imageUrl } });
+  for (const url of images) content.push({ type: "image", source: { type: "url", url } });
   content.push({ type: "text", text: user });
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
-    body: JSON.stringify({ model, max_tokens: 8000, system, messages: [{ role: "user", content }] }),
+    body: JSON.stringify({ model, max_tokens: maxTokens, system, messages: [{ role: "user", content }] }),
   });
   const body = (await response.json()) as { error?: { message: string }; content?: { type: string; text?: string }[] };
   if (!response.ok) throw new Error(body.error?.message ?? `Anthropic answered ${response.status}`);

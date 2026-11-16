@@ -13,6 +13,7 @@ import { KINDS } from "../../../shared/kinds";
 import { DesignThumb } from "../../components/DesignThumb";
 import { LiveApp } from "../../components/LiveApp";
 import { deviceKey } from "../../device";
+import { choosePhotoSource, problemText, usePhotoUpload } from "../../photos";
 import { colors, fonts, timeAgo } from "../../theme";
 
 type Workspace = NonNullable<FunctionReturnType<typeof api.workspaces.get>>;
@@ -116,6 +117,55 @@ function PartCard({ part, index }: { part: Part; index: number }) {
   );
 }
 
+function PhotoShelf({ workspaceId }: { workspaceId: Id<"workspaces"> }) {
+  const key = deviceKey();
+  const photos = useQuery(api.assets.list, { deviceKey: key, workspaceId });
+  const removePhoto = useMutation(api.assets.remove);
+  const upload = usePhotoUpload(workspaceId);
+  const [busy, setBusy] = useState(false);
+
+  const add = async () => {
+    const source = await choosePhotoSource();
+    if (!source) return;
+    setBusy(true);
+    try {
+      if (await upload(source)) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (problem) {
+      Alert.alert("Couldn't add that photo", problemText(problem, "Try another photo."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <View style={{ marginTop: 26 }}>
+      <Text style={styles.shelfTitle}>Photos</Text>
+      <Text style={styles.shelfHint}>Add photos here, then ask Clay to use them, like "put the beach photo at the top of Today".</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }} style={{ marginHorizontal: -20, marginTop: 12 }}>
+        <Pressable testID="add-photo" onPress={add} disabled={busy} style={[styles.photoTile, styles.photoAdd]}>
+          {busy ? <ActivityIndicator color={colors.ink} /> : <SymbolView name="photo.badge.plus" size={22} tintColor={colors.ink} />}
+          <Text style={styles.photoAddText}>Add</Text>
+        </Pressable>
+        {photos?.map((photo) => (
+          <Pressable
+            key={photo._id}
+            testID={`photo-${photo.name}`}
+            onLongPress={() =>
+              Alert.alert(`Delete ${photo.name}?`, "Parts that use it will show an empty frame.", [
+                { text: "Cancel", style: "cancel" },
+                { text: "Delete", style: "destructive", onPress: () => removePhoto({ deviceKey: key, assetId: photo._id }) },
+              ])
+            }
+          >
+            {photo.url ? <Image source={{ uri: photo.url }} style={styles.photoTile} /> : <View style={styles.photoTile} />}
+            <Text numberOfLines={1} style={styles.photoName}>{photo.name}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
 export default function WorkspaceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
@@ -204,6 +254,8 @@ export default function WorkspaceScreen() {
         ))}
       </View>
 
+      <PhotoShelf workspaceId={workspaceId} />
+
       {missing.length > 0 && (
         <Pressable testID="add-part" onPress={addPart} style={styles.addPart}>
           <SymbolView name="plus" size={15} tintColor={colors.ink} weight="bold" />
@@ -237,6 +289,12 @@ const styles = StyleSheet.create({
   pill: { flexDirection: "row", alignItems: "center", gap: 7, height: 40, paddingHorizontal: 14, borderRadius: 20, backgroundColor: colors.canvas },
   pillDark: { backgroundColor: colors.ink },
   pillText: { fontFamily: fonts.semibold, fontSize: 14, color: colors.ink },
+  shelfTitle: { fontFamily: fonts.semibold, fontSize: 13, color: colors.muted, textTransform: "uppercase", letterSpacing: 1.1 },
+  shelfHint: { fontFamily: fonts.regular, fontSize: 14, color: colors.inkSoft, marginTop: 6, lineHeight: 20 },
+  photoTile: { width: 92, height: 92, borderRadius: 18, backgroundColor: colors.surface },
+  photoAdd: { alignItems: "center", justifyContent: "center", gap: 4, borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.muted, backgroundColor: "transparent" },
+  photoAddText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.ink },
+  photoName: { fontFamily: fonts.medium, fontSize: 12, color: colors.inkSoft, marginTop: 5, width: 92 },
   addPart: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 52, borderRadius: 26, marginTop: 18, borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.muted },
   addText: { fontFamily: fonts.semibold, fontSize: 15, color: colors.ink },
 });

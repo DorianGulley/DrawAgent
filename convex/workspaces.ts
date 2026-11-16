@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
-import { insertDesign } from "./designs";
+import { internal } from "./_generated/api";
+import { insertDesign, insertDesignDoc } from "./designs";
 import { cleanText, ownerHashFor } from "./lib";
 import { componentRole } from "./schema";
 import { outline } from "../shared/context";
@@ -173,6 +174,7 @@ export const create = mutation({
     keyId: v.optional(v.id("apiKeys")),
     appProjectId: v.optional(v.id("projects")),
     appTemplateId: v.optional(v.string()),
+    appPrompt: v.optional(v.string()),
     logoTemplateId: v.optional(v.string()),
     iconTemplateId: v.optional(v.string()),
   },
@@ -189,7 +191,39 @@ export const create = mutation({
       keyId: args.keyId,
       updatedAt: Date.now(),
     });
-    await addPart(ctx, ownerHash, workspaceId, "app", { projectId: args.appProjectId, templateId: args.appTemplateId }, 0);
+    const prompt = cleanText(args.appPrompt ?? "", 1200);
+    if (prompt) {
+      if (!args.keyId) throw new Error("Pick a model key so Clay can build the app");
+      const doc: AppDoc = {
+        schemaVersion: 1,
+        root: {
+          id: "screen",
+          type: "screen",
+          name: "Screen",
+          style: {},
+          children: [
+            { id: "building-title", type: "heading", name: "Title", text: "Clay is building your app", style: { fontSize: 28 } },
+            { id: "building-note", type: "text", name: "Description", text: prompt.slice(0, 80), style: {} },
+          ],
+        },
+      };
+      const designId = await insertDesignDoc(ctx, ownerHash, "app", doc, { templateId: "prompt", name: cleanText(args.name, 40) || "App", emoji: cleanText(args.emoji, 8) || "🏺", summary: "Your description" });
+      const componentId = await ctx.db.insert("components", { workspaceId, role: "app", name: ROLE_NAMES.app, usage: DEFAULT_USAGE.app, designId, order: 0 });
+      const runId = await ctx.db.insert("agentRuns", {
+        componentId,
+        workspaceId,
+        note: prompt,
+        marks: [],
+        baseNumber: 0,
+        status: "queued",
+        message: "Sent to Clay",
+        mode: "generate",
+        updatedAt: Date.now(),
+      });
+      await ctx.scheduler.runAfter(0, internal.clay.run, { runId });
+    } else {
+      await addPart(ctx, ownerHash, workspaceId, "app", { projectId: args.appProjectId, templateId: args.appTemplateId }, 0);
+    }
     if (args.logoTemplateId) await addPart(ctx, ownerHash, workspaceId, "logo", { templateId: args.logoTemplateId }, 1);
     if (args.iconTemplateId) await addPart(ctx, ownerHash, workspaceId, "icon", { templateId: args.iconTemplateId }, 2);
     return workspaceId;

@@ -1,6 +1,6 @@
 import { KindSpec } from "./kinds";
 import { AppDoc } from "./model";
-import { renderBody } from "./render";
+import { AssetUrls, renderBody } from "./render";
 
 const STYLES = String.raw`
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -59,6 +59,24 @@ body.d-edit.d-hint [data-direct-id]:not(.d-screen){outline:1.5px dashed rgba(99,
 .d-press{animation:d-press .5s ease}
 @keyframes d-press{0%{transform:scale(1)}40%{transform:scale(.97)}100%{transform:scale(1)}}
 .d-flash{animation:d-flash 1.8s ease-out}
+.d-page{display:none;flex-direction:column}
+.d-page.d-on{display:flex;animation:d-page .22s ease}
+@keyframes d-page{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.d-screen[data-pages="1"]{padding-bottom:calc(var(--inset-bottom,0px) + var(--pad) + 76px)}
+body.d-edit.k-flow .d-screen[data-pages="1"]{padding-bottom:calc(var(--sheet,300px) + var(--pad) + 76px)}
+.d-tabs{position:fixed;left:12px;right:12px;bottom:calc(var(--inset-bottom,0px) + 10px);display:flex;gap:4px;padding:6px;border-radius:24px;background:rgba(255,255,255,.86);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 1px 2px rgba(0,0,0,.06),0 12px 32px rgba(20,16,10,.14);z-index:500;overflow-x:auto}
+body.d-edit .d-tabs{bottom:calc(var(--sheet,300px) + 10px)}
+.d-tab{flex:1;min-width:56px;border:0;background:transparent;border-radius:18px;padding:7px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;font-family:inherit;color:#1B1A17;opacity:.5;transition:all .2s ease}
+.d-tab.d-on{opacity:1;background:var(--tab-accent,rgba(0,0,0,.06))}
+.d-tab-icon{font-size:18px;line-height:1.1}
+.d-tab-label{font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.d-image{overflow:hidden;display:flex;align-items:center;justify-content:center;width:100%;flex-shrink:0}
+.d-image img{width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none}
+.d-image-empty{font-size:13px;font-weight:600;opacity:.45}
+.d-input{display:flex;align-items:center;border:1px solid rgba(0,0,0,.08)}
+.d-input-text{opacity:.45}
+.d-divider{width:100%;flex-shrink:0}
+.d-link{cursor:pointer}
 @keyframes d-flash{0%{box-shadow:0 0 0 0 rgba(99,91,255,.0)}15%{box-shadow:0 0 0 6px rgba(99,91,255,.45)}100%{box-shadow:0 0 0 18px rgba(99,91,255,0)}}
 `;
 
@@ -68,7 +86,19 @@ const RUNTIME = String.raw`
   var sels = document.getElementById('d-sels');
   var cfg = window.__cfg;
   var editMode = false, selected = [], selLabel = '', doneState = {}, focus = null, frame = { top: cfg.insetTop, bottom: cfg.insetBottom };
-  var press = null, suppressClick = false;
+  var press = null, suppressClick = false, page = null;
+  function pages(){ return Array.prototype.slice.call(root.querySelectorAll('.d-screen > .d-page')); }
+  function showPage(id, animate){
+    var all = pages();
+    if (!all.length) return;
+    var target = all.filter(function(p){ return p.getAttribute('data-direct-id') === id; })[0] || all.filter(function(p){ return p.getAttribute('data-direct-id') === page; })[0] || all[0];
+    var changed = page !== target.getAttribute('data-direct-id');
+    page = target.getAttribute('data-direct-id');
+    all.forEach(function(p){ p.classList.toggle('d-on', p === target); });
+    root.querySelectorAll('.d-tab').forEach(function(t){ t.classList.toggle('d-on', t.getAttribute('data-go') === page); });
+    if (changed && animate) { window.scrollTo({ top: 0 }); post({ type: 'haptic' }); }
+    setTimeout(placeSelection, 30);
+  }
   function post(msg){ if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(msg)); }
   function byId(id){ return root.querySelector('[data-direct-id="' + CSS.escape(id) + '"]'); }
   function fit(){
@@ -148,6 +178,8 @@ const RUNTIME = String.raw`
   document.addEventListener('touchend', function(){ if (press) { clearTimeout(press.timer); press = null; } }, { passive: true });
   document.addEventListener('contextmenu', function(e){ if (editMode) e.preventDefault(); });
   document.addEventListener('click', function(e){
+    var tab = e.target.closest('.d-tab');
+    if (tab) { e.preventDefault(); e.stopPropagation(); showPage(tab.getAttribute('data-go'), true); return; }
     var el = e.target.closest('[data-direct-id]');
     if (editMode) {
       e.preventDefault(); e.stopPropagation();
@@ -157,6 +189,8 @@ const RUNTIME = String.raw`
       var info = describe(el); info.type = 'tap'; post(info);
       return;
     }
+    var linked = e.target.closest('[data-target]');
+    if (linked) { showPage(linked.getAttribute('data-target'), true); return; }
     var habit = e.target.closest('.d-habit');
     if (habit) {
       var id = habit.getAttribute('data-direct-id');
@@ -194,7 +228,7 @@ const RUNTIME = String.raw`
     render: function(html, changed){
       if (focus) { clearInterval(focus.interval); focus = null; }
       root.innerHTML = html;
-      syncBackground(); applyDone();
+      syncBackground(); applyDone(); showPage(page, false);
       selected = selected.filter(byId);
       placeSelection();
       (changed || []).forEach(function(id, i){
@@ -202,6 +236,8 @@ const RUNTIME = String.raw`
         if (!el) return;
         el.classList.add('d-flash');
         if (i === 0) {
+          var holder = el.closest('.d-page');
+          if (holder && !holder.classList.contains('d-on')) showPage(holder.getAttribute('data-direct-id'), false);
           var r = el.getBoundingClientRect();
           if (r.top < frame.top || r.bottom > window.innerHeight - frame.bottom) reveal(el);
         }
@@ -219,6 +255,9 @@ const RUNTIME = String.raw`
     setSelection: function(ids, label, focusId){
       selected = (ids || []).slice(); selLabel = label || '';
       placeSelection();
+      var first = byId(focusId || selected[0] || '');
+      var holder = first && first.closest('.d-page');
+      if (holder && !holder.classList.contains('d-on')) showPage(holder.getAttribute('data-direct-id'), false);
       var el = focusId && byId(focusId);
       if (el) reveal(el);
     },
@@ -248,7 +287,7 @@ const RUNTIME = String.raw`
       fit(); setTimeout(placeSelection, 260);
     }
   };
-  fit(); syncBackground(); applyDone();
+  fit(); syncBackground(); applyDone(); showPage(null, false);
   post({ type: 'ready' });
 })();
 `;
@@ -258,12 +297,13 @@ export interface PreviewOptions {
   insetBottom: number;
   canvas: KindSpec["canvas"];
   exporting?: boolean;
+  assets?: AssetUrls;
 }
 
-export function buildPreviewHtml(doc: AppDoc, { insetTop, insetBottom, canvas, exporting = false }: PreviewOptions): string {
+export function buildPreviewHtml(doc: AppDoc, { insetTop, insetBottom, canvas, exporting = false, assets = {} }: PreviewOptions): string {
   const fixed = canvas.layout !== "flow";
   const htmlClass = [fixed ? "k-fixed" : "", exporting ? "d-export" : ""].join(" ");
   const cfg = { insetTop, insetBottom, layout: canvas.layout, width: canvas.width, height: canvas.height ?? 0, exporting };
   const size = fixed ? `--cw:${canvas.width}px;--ch:${canvas.height}px;` : "";
-  return `<!doctype html><html class="${htmlClass}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><style>${STYLES}:root{--inset-top:${fixed ? 0 : insetTop}px;--inset-bottom:${fixed ? 0 : insetBottom}px;${size}}</style></head><body class="k-${canvas.layout}"><div id="d-root">${renderBody(doc)}</div><div id="d-sels"></div><script>window.__cfg=${JSON.stringify(cfg)};${RUNTIME}</script></body></html>`;
+  return `<!doctype html><html class="${htmlClass}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><style>${STYLES}:root{--inset-top:${fixed ? 0 : insetTop}px;--inset-bottom:${fixed ? 0 : insetBottom}px;${size}}</style></head><body class="k-${canvas.layout}"><div id="d-root">${renderBody(doc, assets)}</div><div id="d-sels"></div><script>window.__cfg=${JSON.stringify(cfg)};${RUNTIME}</script></body></html>`;
 }

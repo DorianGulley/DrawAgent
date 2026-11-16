@@ -9,6 +9,7 @@
  */
 
 import type * as agent from "../agent.js";
+import type * as assets from "../assets.js";
 import type * as clay from "../clay.js";
 import type * as designs from "../designs.js";
 import type * as feedback from "../feedback.js";
@@ -30,6 +31,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   agent: typeof agent;
+  assets: typeof assets;
   clay: typeof clay;
   designs: typeof designs;
   feedback: typeof feedback;

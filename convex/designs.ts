@@ -63,29 +63,36 @@ export async function insertDesign(ctx: MutationCtx, ownerHash: string, kindId: 
   const { memory } = await loadMemory(ctx, ownerHash);
   const seeded = applyProfile(template.doc, kind, profileOf(memory));
   const doc = seeded.length ? applyOperations(template.doc, kind, seeded).doc : template.doc;
-  const now = Date.now();
-  const designId = await ctx.db.insert("designs", {
-    ownerHash,
-    kind: kind.id,
+  const designId = await insertDesignDoc(ctx, ownerHash, kind.id, doc, {
     templateId: template.id,
     name: template.name,
     emoji: template.emoji,
+    summary: seeded.length ? `Started from ${template.name}, in your style` : `Started from ${template.name}`,
+  });
+  return { designId, seeded: seeded.length > 0 };
+}
+
+export async function insertDesignDoc(
+  ctx: MutationCtx,
+  ownerHash: string,
+  kindId: string,
+  doc: AppDoc,
+  meta: { templateId: string; name: string; emoji: string; summary: string },
+) {
+  const now = Date.now();
+  const designId = await ctx.db.insert("designs", {
+    ownerHash,
+    kind: kindId,
+    templateId: meta.templateId,
+    name: meta.name,
+    emoji: meta.emoji,
     doc,
     position: 0,
     versionCount: 0,
     updatedAt: now,
   });
-  await ctx.db.insert("designVersions", {
-    designId,
-    number: 0,
-    doc,
-    summary: seeded.length ? `Started from ${template.name}, in your style` : `Started from ${template.name}`,
-    operations: [],
-    changedIds: [],
-    scope: "start",
-    createdAt: now,
-  });
-  return { designId, seeded: seeded.length > 0 };
+  await ctx.db.insert("designVersions", { designId, number: 0, doc, summary: meta.summary, operations: [], changedIds: [], scope: "start", createdAt: now });
+  return designId;
 }
 
 export const create = mutation({

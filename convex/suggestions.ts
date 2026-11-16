@@ -190,7 +190,7 @@ export const generate = internalAction({
     ].join("\n");
     try {
       const apiKey = await decryptSecret(data.key.ciphertext, data.key.iv);
-      const answer = await complete(data.key.provider, apiKey, data.key.model, SYSTEM, request, null);
+      const answer = await complete(data.key.provider, apiKey, data.key.model, SYSTEM, request, []);
       const parsed = parseJson(answer) as { suggestions?: unknown };
       const items = (Array.isArray(parsed.suggestions) ? parsed.suggestions : [])
         .filter((item): item is { partId: string; title: string; reason: string; instruction: string } =>

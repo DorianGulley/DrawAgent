@@ -1,12 +1,14 @@
 import { KindSpec } from "./kinds";
-import { AppDoc, AppNode, CONTAINER_TYPES, NODE_TYPES, NodeType, STYLE_PROPS, StyleMap, StyleProp, StyleValue, TEXT_TYPES, allNodes, findNode, findParent } from "./model";
+import { AppDoc, AppNode, CONTAINER_TYPES, LINKABLE_TYPES, NODE_TYPES, NodeType, SIZED_TYPES, STYLE_PROPS, StyleMap, StyleProp, StyleValue, TEXT_TYPES, allNodes, findNode, findParent, pagesOf, walkNodes } from "./model";
 
 export type Operation =
   | { op: "setText"; targets: string[]; field: "text" | "subtext"; value: string }
   | { op: "setStyle"; targets: string[]; prop: StyleProp; value: StyleValue }
   | { op: "move"; targets: string[]; index: number }
   | { op: "addNode"; targets: string[]; index: number; node: AppNode }
-  | { op: "remove"; targets: string[] };
+  | { op: "remove"; targets: string[] }
+  | { op: "setLink"; targets: string[]; value: string }
+  | { op: "setImage"; targets: string[]; value: string };
 
 export class EditError extends Error {}
 
@@ -25,8 +27,11 @@ export const COLOR_PROPS: StyleProp[] = ["color", "backgroundColor", "accentColo
 const MAX_TEXT_LENGTH = 80;
 const MAX_TARGETS = 200;
 
-const MAX_NEW_NODES = 30;
-const MAX_DEPTH = 4;
+const MAX_NEW_NODES = 80;
+const MAX_DEPTH = 7;
+const MAX_NODES = 600;
+const ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,39}$/;
+const ASSET_PATTERN = /^[a-z0-9]{10,64}$/;
 
 function cleanStyle(style: unknown): StyleMap {
   if (!style || typeof style !== "object") return {};
@@ -47,7 +52,7 @@ function cleanNode(raw: unknown, taken: Set<string>, depth: number, budget: { le
   const type = input.type as NodeType;
   if (!NODE_TYPES.includes(type) || type === "screen") throw new EditError(`${String(input.type)} isn't a part Clay can add`);
   const id = typeof input.id === "string" ? input.id : "";
-  if (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(id) || taken.has(id)) throw new EditError(`The new part needs a fresh id (got ${id || "none"})`);
+  if (!ID_PATTERN.test(id) || taken.has(id)) throw new EditError(`The new part needs a fresh id (got ${id || "none"})`);
   taken.add(id);
   const text = (field: unknown) => (typeof field === "string" ? field.replace(/\s+/g, " ").trim().slice(0, MAX_TEXT_LENGTH) : undefined);
   const node: AppNode = {
@@ -58,10 +63,10 @@ function cleanNode(raw: unknown, taken: Set<string>, depth: number, budget: { le
   };
   if (TEXT_TYPES.includes(type)) node.text = text(input.text) ?? "";
   if (type === "habit" || type === "stat") node.subtext = text(input.subtext) ?? "";
-  if (type === "habit") {
-    node.icon = text(input.icon)?.slice(0, 4);
-    node.done = input.done === true;
-  }
+  if (type === "habit" || type === "page") node.icon = text(input.icon)?.slice(0, 4);
+  if (type === "habit") node.done = input.done === true;
+  if (type === "image") node.src = typeof input.src === "string" && ASSET_PATTERN.test(input.src) ? input.src : "";
+  if (LINKABLE_TYPES.includes(type) && typeof input.target === "string" && ID_PATTERN.test(input.target)) node.target = input.target;
   if (CONTAINER_TYPES.includes(type)) {
     const children = Array.isArray(input.children) ? input.children : [];
     node.children = children.map((child) => cleanNode(child, taken, depth + 1, budget));
@@ -72,9 +77,12 @@ function cleanNode(raw: unknown, taken: Set<string>, depth: number, budget: { le
 function eligible(node: AppNode, operation: Operation, root: AppNode): boolean {
   if (operation.op === "addNode") return CONTAINER_TYPES.includes(node.type);
   if (operation.op === "remove") return node.id !== root.id;
+  if (operation.op === "setLink") return LINKABLE_TYPES.includes(node.type);
+  if (operation.op === "setImage") return node.type === "image";
   if (operation.op === "setText") return TEXT_TYPES.includes(node.type) && (operation.field === "text" || node.subtext !== undefined);
   if (operation.op === "move") return Boolean(findParent(root, node.id)?.children);
-  if (operation.prop === "height" || operation.prop === "width") return ["progress", "shape"].includes(node.type);
+  if (operation.prop === "width") return node.type === "shape";
+  if (operation.prop === "height") return SIZED_TYPES.includes(node.type);
   return true;
 }
 
@@ -116,6 +124,12 @@ function validValue(operation: Operation): Operation {
       return operation;
     case "remove":
       return operation;
+    case "setLink":
+      if (typeof operation.value !== "string" || (operation.value !== "" && !ID_PATTERN.test(operation.value))) throw new EditError("That link goes nowhere");
+      return operation;
+    case "setImage":
+      if (typeof operation.value !== "string" || !ASSET_PATTERN.test(operation.value)) throw new EditError("That isn't one of your photos");
+      return operation;
     default:
       throw new EditError("Clay doesn't know that change");
   }
@@ -127,7 +141,7 @@ export function validateOperation(doc: AppDoc, kind: KindSpec, operation: Operat
   if (operation.op === "setText" && !kind.ops.text) throw new EditError(`A ${kind.name.toLowerCase()} can't change words`);
   if (operation.op === "move" && !kind.ops.move) throw new EditError(`Things in a ${kind.name.toLowerCase()} can't be moved`);
   if (operation.op === "setStyle" && !kind.ops.styles.includes(operation.prop)) throw new EditError(`A ${kind.name.toLowerCase()} can't change that`);
-  if ((operation.op === "addNode" || operation.op === "remove") && !kind.ops.structure) throw new EditError(`A ${kind.name.toLowerCase()} can't add or remove parts`);
+  if ((operation.op === "addNode" || operation.op === "remove" || operation.op === "setLink" || operation.op === "setImage") && !kind.ops.structure) throw new EditError(`A ${kind.name.toLowerCase()} can't add or remove parts`);
   const valid = validValue(operation);
   const targets = [...new Set(valid.targets)].filter((id) => {
     const node = typeof id === "string" ? findNode(doc.root, id) : null;
@@ -141,8 +155,10 @@ export function validateOperation(doc: AppDoc, kind: KindSpec, operation: Operat
   if (valid.op === "addNode") {
     const taken = new Set(allNodes(doc.root).map((node) => node.id));
     const node = cleanNode(valid.node, taken, 1, { left: MAX_NEW_NODES });
-    const siblings = findNode(doc.root, targets[0])!.children ?? [];
-    if (allNodes(doc.root).length + allNodes(node).length > 400) throw new EditError("The design is getting too big");
+    const parent = findNode(doc.root, targets[0])!;
+    if (node.type === "page" && parent.id !== doc.root.id) throw new EditError("Pages go at the top level of the app");
+    const siblings = parent.children ?? [];
+    if (allNodes(doc.root).length + allNodes(node).length > MAX_NODES) throw new EditError("The design is getting too big");
     return { ...valid, targets, node, index: Math.min(siblings.length, Math.max(0, valid.index)) };
   }
   return { ...valid, targets };
@@ -174,6 +190,13 @@ function applyOne(root: AppNode, operation: Operation) {
         if (parent?.children) parent.children = parent.children.filter((child) => child.id !== id);
         break;
       }
+      case "setLink":
+        if (operation.value) node.target = operation.value;
+        else delete node.target;
+        break;
+      case "setImage":
+        node.src = operation.value;
+        break;
     }
   }
 }
@@ -199,6 +222,7 @@ export function applyOperations(
     applied.push(valid);
   }
   if (applied.length === 0) throw new EditError("None of the selected things can take that change");
+  pruneLinks(next.root);
   return { doc: next, operations: applied, changedIds: [...new Set(applied.flatMap((operation) => (operation.op === "addNode" ? [...operation.targets, operation.node.id] : operation.targets)))] };
 }
 
@@ -216,4 +240,31 @@ export function mergeOperations(operations: Operation[]): Operation[] {
     else merged.push({ ...operation, targets: [...operation.targets] });
   }
   return merged;
+}
+
+function pruneLinks(root: AppNode) {
+  const pages = new Set(pagesOf(root).map((page) => page.id));
+  walkNodes(root, (node) => {
+    if (node.target && !pages.has(node.target)) delete node.target;
+  });
+}
+
+export function validateDoc(raw: unknown, kind: KindSpec): AppDoc {
+  const input = (raw && typeof raw === "object" && "root" in raw ? (raw as { root: unknown }).root : raw) as Record<string, unknown> | null;
+  if (!input || typeof input !== "object") throw new EditError("The app has no screen");
+  const children = Array.isArray(input.children) ? input.children : [];
+  if (children.length === 0) throw new EditError("The app is empty");
+  const taken = new Set<string>(["screen"]);
+  const budget = { left: MAX_NODES };
+  const root: AppNode = {
+    id: "screen",
+    type: "screen",
+    name: typeof input.name === "string" ? input.name.slice(0, 40) : "Screen",
+    style: Object.fromEntries(Object.entries(cleanStyle(input.style)).filter(([prop]) => kind.ops.styles.includes(prop as StyleProp))) as StyleMap,
+    children: children.map((child) => cleanNode(child, taken, 1, budget)),
+  };
+  const nested = allNodes(root).filter((node) => node.type === "page" && !root.children!.includes(node));
+  if (nested.length) throw new EditError("Pages go at the top level of the app");
+  pruneLinks(root);
+  return { schemaVersion: 1, root };
 }

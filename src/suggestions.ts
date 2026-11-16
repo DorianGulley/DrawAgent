@@ -17,6 +17,10 @@ const SUGGESTIONS: Record<NodeType, string[]> = {
   row: ["Add more space between them", "Tighter spacing"],
   shape: ["Make it rounder", "Make it bigger and green", "Make it a circle", "Square the corners"],
   clock: ["Make it bigger", "Make it thinner", "Make the text cream"],
+  page: ["Add more spacing", "Change the tab name to 'Home'"],
+  image: ["Make it taller", "Rounder corners", "Square the corners"],
+  input: ["Make it rounder", "Give it a light gray background"],
+  divider: ["Make it darker", "Make it thicker"],
 };
 
 export const EVERYTHING_SUGGESTIONS = ["Make the whole thing feel warmer", "Tighten all the spacing", "Rounder corners everywhere", "Match my style", "Bigger text", "Cooler colors"];

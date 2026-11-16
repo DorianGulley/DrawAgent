@@ -1,4 +1,6 @@
-import { AppDoc, AppNode, StyleMap, TYPE_LABELS, effectiveStyle } from "./model";
+import { AppDoc, AppNode, SIZED_TYPES, StyleMap, TYPE_LABELS, effectiveStyle } from "./model";
+
+export type AssetUrls = Record<string, string>;
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -22,10 +24,8 @@ function css(node: AppNode, style: StyleMap): string {
   if (node.type === "screen" && style.accentColor && style.backgroundColor)
     rules.push(`background:linear-gradient(180deg,${style.backgroundColor} 0%,${style.accentColor} 100%)`);
   else if (style.backgroundColor) rules.push(`background:${style.backgroundColor}`);
-  if (node.type === "shape") {
-    if (style.width) rules.push(`width:${px(style.width)}`);
-    if (style.height) rules.push(`height:${px(style.height)}`);
-  }
+  if (node.type === "shape" && style.width) rules.push(`width:${px(style.width)}`);
+  if (SIZED_TYPES.includes(node.type) && style.height) rules.push(`height:${px(style.height)}`);
   const padding = Number(style.padding ?? 0);
   if (node.type === "screen") rules.push(`--pad:${px(padding)}`);
   else if (node.type === "button") rules.push(`padding:${px(padding)} ${px(Math.round(padding * 1.4))}`);
@@ -34,11 +34,12 @@ function css(node: AppNode, style: StyleMap): string {
   return rules.join(";");
 }
 
-function renderNode(node: AppNode): string {
+function renderNode(node: AppNode, assets: AssetUrls): string {
   const style = effectiveStyle(node);
-  const attrs = `data-direct-id="${escapeHtml(node.id)}" data-direct-type="${node.type}" data-direct-label="${TYPE_LABELS[node.type]}" class="d-${node.type}" style="${css(node, style)}"`;
+  const link = node.target ? ` data-target="${escapeHtml(node.target)}"` : "";
+  const attrs = `data-direct-id="${escapeHtml(node.id)}" data-direct-type="${node.type}" data-direct-label="${TYPE_LABELS[node.type]}" class="d-${node.type}${node.target ? " d-link" : ""}" style="${css(node, style)}"${link}`;
   const text = escapeHtml(node.text ?? "");
-  const children = (node.children ?? []).map(renderNode).join("");
+  const children = (node.children ?? []).map((child) => renderNode(child, assets)).join("");
   switch (node.type) {
     case "heading":
       return `<h2 ${attrs}>${text}</h2>`;
@@ -56,13 +57,31 @@ function renderNode(node: AppNode): string {
       return `<div ${attrs}><div class="d-stat-value">${text}</div><div class="d-stat-label">${escapeHtml(node.subtext ?? "")}</div></div>`;
     case "clock":
       return `<div ${attrs}>${text}</div>`;
-    case "screen":
-      return `<main ${attrs}>${children}</main>`;
+    case "page":
+      return `<section ${attrs}>${children}</section>`;
+    case "image": {
+      const url = node.src ? assets[node.src] : undefined;
+      return url && /^https:\/\//.test(url)
+        ? `<div ${attrs}><img src="${escapeHtml(url)}" alt="" draggable="false"></div>`
+        : `<div ${attrs}><span class="d-image-empty">${node.src ? "Loading photo" : "Photo"}</span></div>`;
+    }
+    case "input":
+      return `<div ${attrs}><span class="d-input-text">${text}</span></div>`;
+    case "divider":
+      return `<div ${attrs}></div>`;
+    case "screen": {
+      const pages = (node.children ?? []).filter((child) => child.type === "page");
+      if (pages.length === 0) return `<main ${attrs}>${children}</main>`;
+      const tabs = pages
+        .map((page) => `<button class="d-tab" data-go="${escapeHtml(page.id)}"><span class="d-tab-icon">${escapeHtml(page.icon ?? "•")}</span><span class="d-tab-label">${escapeHtml(page.text || page.name)}</span></button>`)
+        .join("");
+      return `<main ${attrs} data-pages="1">${children}<nav class="d-tabs">${tabs}</nav></main>`;
+    }
     default:
       return `<div ${attrs}>${children}</div>`;
   }
 }
 
-export function renderBody(doc: AppDoc): string {
-  return renderNode(doc.root);
+export function renderBody(doc: AppDoc, assets: AssetUrls = {}): string {
+  return renderNode(doc.root, assets);
 }

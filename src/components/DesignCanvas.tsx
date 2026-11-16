@@ -1,12 +1,15 @@
+import { useQuery } from "convex/react";
 import * as Haptics from "expo-haptics";
 import { ComponentType, Ref, RefObject, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { StyleProp, ViewStyle } from "react-native";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
 import type { IOSWebViewProps } from "react-native-webview/lib/WebViewTypes";
 import { KindSpec } from "../../shared/kinds";
-import { AppDoc, NodeType } from "../../shared/model";
+import { api } from "../../convex/_generated/api";
+import { AppDoc, NodeType, imageSources } from "../../shared/model";
 import { buildPreviewHtml } from "../../shared/preview";
-import { renderBody } from "../../shared/render";
+import { AssetUrls, renderBody } from "../../shared/render";
+import { deviceKey } from "../device";
 import type { ElementInfo, Probe } from "./LiveApp";
 
 export interface CanvasHandle {
@@ -65,7 +68,11 @@ export function DesignCanvas({
 }: Props) {
   const ownRef = useRef<WebView>(null);
   const webRef = viewRef ?? ownRef;
-  const [html] = useState(() => buildPreviewHtml(doc, { insetTop, insetBottom, canvas: kind.canvas, exporting }));
+  const sources = imageSources(doc.root);
+  const urls = useQuery(api.assets.urls, sources.length ? { deviceKey: deviceKey(), ids: sources } : "skip");
+  const assets = useRef<AssetUrls>({});
+  assets.current = urls ?? assets.current;
+  const [html] = useState(() => buildPreviewHtml(doc, { insetTop, insetBottom, canvas: kind.canvas, exporting, assets: assets.current }));
   const ready = useRef(false);
   const latest = useRef({ doc, editMode, selection, selectionLabel, insetTop, insetBottom });
   useEffect(() => {
@@ -87,13 +94,17 @@ export function DesignCanvas({
   }));
 
   const run = (script: string) => webRef.current?.injectJavaScript(`${script};true;`);
-  const render = (next: AppDoc, changed: string[]) => run(`window.__direct.render(${JSON.stringify(renderBody(next))}, ${JSON.stringify(changed)})`);
+  const render = (next: AppDoc, changed: string[]) => run(`window.__direct.render(${JSON.stringify(renderBody(next, assets.current))}, ${JSON.stringify(changed)})`);
   const select = (ids: string[], label: string, focus: string | null) =>
     run(`window.__direct.setSelection(${JSON.stringify(ids)}, ${JSON.stringify(label)}, ${JSON.stringify(focus)})`);
 
   useEffect(() => {
     if (ready.current) render(doc, changedIds);
   }, [doc]);
+
+  useEffect(() => {
+    if (ready.current && urls) render(latest.current.doc, []);
+  }, [JSON.stringify(urls ?? {})]);
 
   useEffect(() => {
     if (ready.current) run(`window.__direct.setEditMode(${editMode})`);

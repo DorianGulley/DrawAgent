@@ -20,6 +20,7 @@ import { Annotator, Mark } from "../../components/Annotator";
 import { CanvasHandle, DesignCanvas, Picked } from "../../components/DesignCanvas";
 import { MakeSheet, Scope } from "../../components/MakeSheet";
 import { deviceKey } from "../../device";
+import { choosePhotoSource, usePhotoUpload } from "../../photos";
 import { colors, fonts, timeAgo } from "../../theme";
 
 type CommitScope = "one" | "many" | "everything" | "example";
@@ -39,6 +40,7 @@ export function DesignEditor({ designId, componentId, base }: { designId: Id<"de
   const iterate = useMutation(api.clay.iterate);
   const suggestions = useQuery(api.suggestions.forComponent, componentId ? { deviceKey: key, componentId } : "skip");
   const requestSuggestions = useMutation(api.suggestions.request);
+  const uploadPhoto = usePhotoUpload(part?.workspace._id);
   const applySuggestion = useMutation(api.suggestions.apply);
   const declineSuggestion = useMutation(api.suggestions.decline);
   const frame = useRef<ComponentRef<typeof View>>(null);
@@ -305,7 +307,7 @@ export function DesignEditor({ designId, componentId, base }: { designId: Id<"de
     setAnnotating({ frameUri, baseNumber });
   }
 
-  const submitMarkup = async ({ note, marks, imageUri }: { note: string; marks: Mark[]; imageUri: string }) => {
+  const submitMarkup = async ({ note, marks, imageUri, assetIds }: { note: string; marks: Mark[]; imageUri: string; assetIds: string[] }) => {
     if (!componentId || !annotating) return;
     const uploadUrl = await generateUploadUrl();
     const image = await (await fetch(imageUri)).blob();
@@ -319,6 +321,7 @@ export function DesignEditor({ designId, componentId, base }: { designId: Id<"de
       marks: marks.map((mark) => ({ tag: mark.tag, text: mark.text, ids: mark.elements.map((element) => element.selector) })),
       imageId: storageId,
       baseNumber: annotating.baseNumber,
+      assetIds: assetIds as Id<"assets">[],
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setAnnotating(null);
@@ -552,6 +555,10 @@ export function DesignEditor({ designId, componentId, base }: { designId: Id<"de
           <Annotator
             frameUri={annotating.frameUri}
             agentName="Clay"
+            onAttachPhoto={kind.ops.structure ? async () => {
+              const source = await choosePhotoSource();
+              return source ? await uploadPhoto(source) : null;
+            } : undefined}
             subject={`your ${kind.name.toLowerCase()}`}
             heading={annotating.baseNumber !== design.position ? `Marking up version ${annotating.baseNumber}` : undefined}
             hitTest={(probes) => canvasHandle.current?.hitTest(probes) ?? Promise.resolve(probes.map(() => []))}
