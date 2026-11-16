@@ -67,6 +67,10 @@ export async function runMcpServer(config: DirectConfig, configFile: string) {
             elements: mark.elements,
           })),
           legend: "Mark points are in CSS pixels of the viewport at the time of capture. Tag meaning: change = modify this, broken = this is a bug, keep = do not change this.",
+          workspace: item.workspace ?? undefined,
+          workspaceLegend: item.workspace
+            ? "This app belongs to a Clay workspace. The workspace lists the app's other parts (logo, app icon) with how they relate. In-app designs are given as a part tree with styles; keep the app consistent with them (for example use the logo's colors and letterforms in the header)."
+            : undefined,
         };
         const content: any[] = [{ type: "text", text: JSON.stringify(details, null, 2) }];
         if (item.imageUrl) {

@@ -23,7 +23,7 @@ export function Timeline({ projectId, agent, latestVersionId, visible, onClose }
   const open = (feedback ?? []).filter((item) => item.status !== "published");
 
   const revert = (versionId: Id<"versions">, number: number) =>
-    Alert.alert(`Roll back to v${number}?`, `Direct will ask ${agentLabel(agent)} to restore v${number}. Nothing changes until it publishes.`, [
+    Alert.alert(`Roll back to v${number}?`, `Clay will ask ${agentLabel(agent)} to restore v${number}. Nothing changes until it publishes.`, [
       { text: "Cancel", style: "cancel" },
       { text: "Ask agent", onPress: () => requestRevert({ versionId }).then(onClose) },
     ]);

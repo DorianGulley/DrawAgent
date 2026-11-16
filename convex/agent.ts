@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { MutationCtx } from "./_generated/server";
 import { withImages } from "./feedback";
+import { workspaceContext } from "./workspaces";
 import { cleanText, cleanUrl, projectForKey } from "./lib";
 
 async function ownedFeedback(ctx: MutationCtx, key: string, feedbackId: Id<"feedback">) {
@@ -64,7 +65,16 @@ export const get = query({
     const item = await ctx.db.get("feedback", feedbackId);
     if (!item || item.projectId !== project._id) throw new Error("Feedback not found for this project");
     const base = item.baseVersionId ? await ctx.db.get("versions", item.baseVersionId) : null;
-    return { ...(await withImages(ctx, item)), projectUrl: project.url, baseVersion: base ? { number: base.number, commitSha: base.commitSha ?? null } : null };
+    const component = await ctx.db
+      .query("components")
+      .withIndex("by_projectId", (q) => q.eq("projectId", project._id))
+      .first();
+    return {
+      ...(await withImages(ctx, item)),
+      projectUrl: project.url,
+      baseVersion: base ? { number: base.number, commitSha: base.commitSha ?? null } : null,
+      workspace: component ? await workspaceContext(ctx, component.workspaceId, component._id) : null,
+    };
   },
 });
 

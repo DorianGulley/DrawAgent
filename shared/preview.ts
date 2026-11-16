@@ -14,7 +14,7 @@ body.d-edit.k-flow .d-screen{padding-bottom:calc(var(--sheet,300px) + var(--pad)
 .d-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
 .d-row{display:flex;flex-direction:row;align-items:center}
 .d-row>.d-card{flex:1;min-width:0;align-self:stretch}
-.d-shape{display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.d-shape{display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
 .d-shape .d-heading{line-height:1}
 .d-clock{line-height:1;letter-spacing:-0.045em;font-variant-numeric:tabular-nums}
 html.k-fixed{background:#E9E6E0;overflow:hidden;height:100%}
@@ -221,6 +221,26 @@ const RUNTIME = String.raw`
       placeSelection();
       var el = focusId && byId(focusId);
       if (el) reveal(el);
+    },
+    hitTest: function(requestId, probes){
+      var out = probes.map(function(probe){
+        var ids = [];
+        (probe.points || []).forEach(function(pt){
+          var el = document.elementFromPoint(pt.x, pt.y);
+          var hit = el && el.closest('[data-direct-id]');
+          while (hit && ids.length < 4) {
+            var id = hit.getAttribute('data-direct-id');
+            if (ids.indexOf(id) === -1) ids.push(id);
+            if (probe.kind !== 'area') break;
+            hit = hit.parentElement && hit.parentElement.closest('[data-direct-id]');
+          }
+        });
+        return ids.slice(0, 4).map(function(id){
+          var el = byId(id);
+          return { selector: id, tag: el.getAttribute('data-direct-type'), text: (el.textContent || '').trim().slice(0, 80), styles: {} };
+        });
+      });
+      post({ type: 'hit', requestId: requestId, result: out });
     },
     setFrame: function(top, bottom){
       frame = { top: top, bottom: bottom };

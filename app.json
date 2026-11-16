@@ -39,8 +39,8 @@
       [
         "expo-media-library",
         {
-          "savePhotosPermission": "Clay saves your lock screens and logos to Photos.",
-          "photosPermission": "Clay saves your lock screens and logos to Photos."
+          "savePhotosPermission": "Clay saves your logos and icons to Photos.",
+          "photosPermission": "Clay saves your logos and icons to Photos."
         }
       ]
     ],

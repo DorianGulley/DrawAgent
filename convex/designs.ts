@@ -57,40 +57,78 @@ export const get = query({
   },
 });
 
+export async function insertDesign(ctx: MutationCtx, ownerHash: string, kindId: string, templateId: string) {
+  const kind = kindOf(kindId);
+  const template = findTemplate(kindId, templateId);
+  const { memory } = await loadMemory(ctx, ownerHash);
+  const seeded = applyProfile(template.doc, kind, profileOf(memory));
+  const doc = seeded.length ? applyOperations(template.doc, kind, seeded).doc : template.doc;
+  const now = Date.now();
+  const designId = await ctx.db.insert("designs", {
+    ownerHash,
+    kind: kind.id,
+    templateId: template.id,
+    name: template.name,
+    emoji: template.emoji,
+    doc,
+    position: 0,
+    versionCount: 0,
+    updatedAt: now,
+  });
+  await ctx.db.insert("designVersions", {
+    designId,
+    number: 0,
+    doc,
+    summary: seeded.length ? `Started from ${template.name}, in your style` : `Started from ${template.name}`,
+    operations: [],
+    changedIds: [],
+    scope: "start",
+    createdAt: now,
+  });
+  return { designId, seeded: seeded.length > 0 };
+}
+
 export const create = mutation({
   args: { deviceKey: v.string(), kind: v.string(), templateId: v.string() },
-  handler: async (ctx, { deviceKey, kind: kindId, templateId }) => {
-    const ownerHash = await ownerHashFor(deviceKey);
-    const kind = kindOf(kindId);
-    const template = findTemplate(kindId, templateId);
-    const { memory } = await loadMemory(ctx, ownerHash);
-    const seeded = applyProfile(template.doc, kind, profileOf(memory));
-    const doc = seeded.length ? applyOperations(template.doc, kind, seeded).doc : template.doc;
-    const now = Date.now();
-    const designId = await ctx.db.insert("designs", {
-      ownerHash,
-      kind: kind.id,
-      templateId: template.id,
-      name: template.name,
-      emoji: template.emoji,
-      doc,
-      position: 0,
-      versionCount: 0,
-      updatedAt: now,
-    });
-    await ctx.db.insert("designVersions", {
-      designId,
-      number: 0,
-      doc,
-      summary: seeded.length ? `Started from ${template.name}, in your style` : `Started from ${template.name}`,
-      operations: [],
-      changedIds: [],
-      scope: "start",
-      createdAt: now,
-    });
-    return { designId, seeded: seeded.length > 0 };
-  },
+  handler: async (ctx, { deviceKey, kind, templateId }) => await insertDesign(ctx, await ownerHashFor(deviceKey), kind, templateId),
 });
+
+export async function commitOperations(
+  ctx: MutationCtx,
+  design: Doc<"designs">,
+  ownerHash: string,
+  input: { operations: Operation[]; summary: string; scope: Doc<"designVersions">["scope"]; instruction?: string; fromNumber?: number },
+) {
+  const parent = input.fromNumber ?? design.position;
+  const base = parent === design.position ? design.doc : (await versionAt(ctx, design._id, parent))?.doc;
+  if (!base) return { ok: false as const, message: "That version is gone" };
+  let result;
+  try {
+    result = applyOperations(base as AppDoc, kindOf(design.kind), input.operations);
+  } catch (error) {
+    if (error instanceof EditError) return { ok: false as const, message: error.message };
+    throw error;
+  }
+  const number = design.versionCount + 1;
+  await ctx.db.insert("designVersions", {
+    designId: design._id,
+    number,
+    doc: result.doc,
+    summary: input.summary.slice(0, 160) || "Changed the look",
+    operations: result.operations,
+    changedIds: result.changedIds,
+    scope: input.scope,
+    instruction: input.instruction?.slice(0, 500),
+    parent,
+    createdAt: Date.now(),
+  });
+  await ctx.db.patch("designs", design._id, { doc: result.doc, position: number, versionCount: number, updatedAt: Date.now() });
+  if (input.scope !== "everything" && input.scope !== "agent") {
+    const { memory } = await loadMemory(ctx, ownerHash);
+    await saveMemory(ctx, ownerHash, tallyOperations(memory, result.doc, result.operations));
+  }
+  return { ok: true as const, number, changedIds: result.changedIds };
+}
 
 export const commit = mutation({
   args: {
@@ -103,36 +141,7 @@ export const commit = mutation({
   },
   handler: async (ctx, { deviceKey, designId, operations, summary, scope, instruction }) => {
     const { design, ownerHash } = await ownedDesign(ctx, deviceKey, designId);
-    let result;
-    try {
-      result = applyOperations(design.doc as AppDoc, kindOf(design.kind), operations as Operation[]);
-    } catch (error) {
-      if (error instanceof EditError) return { ok: false as const, message: error.message };
-      throw error;
-    }
-    const stale = await ctx.db
-      .query("designVersions")
-      .withIndex("by_designId_and_number", (q) => q.eq("designId", designId).gt("number", design.position))
-      .take(200);
-    for (const row of stale) await ctx.db.delete("designVersions", row._id);
-    const number = design.position + 1;
-    await ctx.db.insert("designVersions", {
-      designId,
-      number,
-      doc: result.doc,
-      summary: summary.slice(0, 120) || "Changed the look",
-      operations: result.operations,
-      changedIds: result.changedIds,
-      scope,
-      instruction: instruction?.slice(0, 300),
-      createdAt: Date.now(),
-    });
-    await ctx.db.patch("designs", designId, { doc: result.doc, position: number, versionCount: number, updatedAt: Date.now() });
-    if (scope !== "everything") {
-      const { memory } = await loadMemory(ctx, ownerHash);
-      await saveMemory(ctx, ownerHash, tallyOperations(memory, result.doc, result.operations));
-    }
-    return { ok: true as const, number, changedIds: result.changedIds };
+    return await commitOperations(ctx, design, ownerHash, { operations: operations as Operation[], summary, scope, instruction });
   },
 });
 
@@ -140,15 +149,38 @@ export const undo = mutation({
   args: { deviceKey: v.string(), designId: v.id("designs") },
   handler: async (ctx, { deviceKey, designId }) => {
     const { design, ownerHash } = await ownedDesign(ctx, deviceKey, designId);
-    if (design.position <= 0) return null;
     const current = await versionAt(ctx, designId, design.position);
-    const previous = await versionAt(ctx, designId, design.position - 1);
-    if (!current || !previous) return null;
+    if (!current || current.number === 0) return null;
+    const previous = await versionAt(ctx, designId, current.parent ?? current.number - 1);
+    if (!previous) return null;
     await moveTo(ctx, design, previous);
-    if (current.scope === "everything") return { changedIds: current.changedIds, summary: current.summary };
+    if (current.scope === "everything" || current.scope === "agent") return { changedIds: current.changedIds, summary: current.summary };
     const { memory } = await loadMemory(ctx, ownerHash);
     await saveMemory(ctx, ownerHash, untallyOperations(memory, current.doc as AppDoc, current.operations as Operation[]));
     return { changedIds: current.changedIds, summary: current.summary };
+  },
+});
+
+export const versions = query({
+  args: { deviceKey: v.string(), designId: v.id("designs") },
+  handler: async (ctx, { deviceKey, designId }) => {
+    const ownerHash = await ownerHashFor(deviceKey);
+    const design = await ctx.db.get("designs", designId);
+    if (!design || design.ownerHash !== ownerHash) return null;
+    const rows = await ctx.db
+      .query("designVersions")
+      .withIndex("by_designId_and_number", (q) => q.eq("designId", designId))
+      .order("desc")
+      .take(60);
+    return rows.reverse().map((row) => ({
+      number: row.number,
+      parent: row.parent ?? null,
+      doc: row.doc as AppDoc,
+      summary: row.summary,
+      scope: row.scope,
+      changedIds: row.changedIds,
+      createdAt: row.createdAt,
+    }));
   },
 });
 

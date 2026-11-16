@@ -21,7 +21,7 @@ export default function YourStyle() {
   const [editing, setEditing] = useState<StyleCategory | null>(null);
 
   const confirmReset = () =>
-    Alert.alert("Start fresh?", "Direct forgets everything it learned about your style.", [
+    Alert.alert("Start fresh?", "Clay forgets everything it learned about your style.", [
       { text: "Cancel", style: "cancel" },
       { text: "Forget it all", style: "destructive", onPress: () => reset({ deviceKey: key }) },
     ]);
@@ -33,7 +33,7 @@ export default function YourStyle() {
       </Pressable>
       <Text style={styles.title}>Your style</Text>
       <Text style={styles.sub}>
-        Direct learns from the changes you keep. New designs start this way, and “Use my style” applies it in one tap. Anything you ask for directly always wins.
+        Clay learns from the changes you keep. New designs start this way, and “Use my style” applies it in one tap. Anything you ask for directly always wins.
       </Text>
 
       {!data ? (
