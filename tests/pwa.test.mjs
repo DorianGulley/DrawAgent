@@ -29,7 +29,9 @@ test('installation precaches the exported shell and all route chunks', async () 
   w.handlers.get('install')({ waitUntil: (promise) => { done = promise; } }); await done;
   const files = w.precache();
   assert.ok(files.includes('/index.html')); assert.ok(files.includes('/manifest.json'));
-  assert.ok(files.some((path) => path.includes('/js/web/entry-')));
+  assert.ok(files.some((path) => /\/js\/web-pwa-[^/]+\/entry-/.test(path)));
+  assert.ok(files.some((path) => path.includes('/assets/vendor/expo-google-fonts/')));
+  assert.equal(files.some((path) => path.includes('/node_modules/')), false);
   for (const path of files) await readFile(new URL(`../dist${path}`, import.meta.url));
 });
 test('offline deep links return the app shell', async () => {

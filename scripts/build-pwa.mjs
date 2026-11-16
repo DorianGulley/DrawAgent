@@ -1,10 +1,27 @@
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, rename, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 
 async function filesIn(path) {
   const entries = await readdir(path, { withFileTypes: true });
   return (await Promise.all(entries.map((entry) => entry.isDirectory() ? filesIn(`${path}/${entry.name}`) : `${path}/${entry.name}`))).flat();
 }
+// Static hosts can block dependency-directory URLs, even for exported assets.
+// Give rewritten bundles their own content-derived directory to avoid stale
+// immutable caches retaining a bundle that still points to those blocked URLs.
+const exported = await filesIn("dist");
+const bundleHash = createHash("sha256").update("clay-pwa-assets-v1");
+for (const file of exported.filter((file) => file.endsWith(".js"))) bundleHash.update(await readFile(file));
+const bundleDirectory = `web-pwa-${bundleHash.digest("hex").slice(0, 12)}`;
+for (const file of exported.filter((file) => /\.(js|json|html|css)$/.test(file))) {
+  const original = await readFile(file, "utf8");
+  const rewritten = original.replaceAll("/assets/node_modules/", "/assets/vendor/")
+    .replaceAll("/@expo-google-fonts/", "/expo-google-fonts/")
+    .replaceAll("/_expo/static/js/web/", `/_expo/static/js/${bundleDirectory}/`);
+  if (original !== rewritten) await writeFile(file, rewritten);
+}
+await rename("dist/assets/node_modules", "dist/assets/vendor");
+await rename("dist/assets/vendor/@expo-google-fonts", "dist/assets/vendor/expo-google-fonts");
+await rename("dist/_expo/static/js/web", `dist/_expo/static/js/${bundleDirectory}`);
 const files = (await filesIn("dist")).filter((file) => !file.endsWith(".map") && !file.endsWith("sw.js"));
 const version = createHash("sha256");
 for (const file of files) version.update(await readFile(file));
